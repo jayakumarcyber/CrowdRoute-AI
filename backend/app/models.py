@@ -140,7 +140,7 @@ class FestivalProgramme(BaseModel):
 
 
 class WeatherScenario(BaseModel):
-    condition: Literal["clear", "light_rain", "heavy_rain"] = Field(default="clear")
+    condition: Literal["clear", "cloudy", "rainy", "light_rain", "heavy_rain"] = Field(default="clear")
     surge_concentration_factor: float = Field(default=1.0, gt=0.0, description="Multiplier compressing surge into fewer intervals")
     travel_time_multiplier: float = Field(default=1.0, ge=1.0, description="Congestion/rain slowdown factor on travel time")
     notes: Optional[str] = Field(default="")
@@ -293,7 +293,7 @@ class ForecastRequest(BaseModel):
         pattern=TIME_HH_MM_REGEX,
         description="Optional override for final event ending time (HH:MM)"
     )
-    weather_condition_override: Optional[Literal["clear", "light_rain", "heavy_rain"]] = None
+    weather_condition_override: Optional[Literal["clear", "cloudy", "rainy", "light_rain", "heavy_rain"]] = None
     attendance_override: Optional[int] = Field(default=None, ge=0)
     operational_mode: OperationalMode = Field(default="DEMO_SYNTHETIC")
     historical_records: Optional[List[HistoricalRecord]] = Field(default=None)
@@ -434,3 +434,57 @@ class SimulateResponse(BaseModel):
     proposed_simulation: SimulationRunResult
     net_comparison: Dict[str, Any]
     fleet_audit: FleetAudit
+
+
+# =====================================================================
+# PUBLIC COMPLAINTS & GRIEVANCE REPORTING MODELS
+# =====================================================================
+
+ComplaintCategory = Literal[
+    "Overcrowding",
+    "Bus Not Available",
+    "Bus Delay",
+    "Long Waiting Time",
+    "Stop Facilities",
+    "Other"
+]
+
+ComplaintStatus = Literal["Received", "Under Review", "Resolved"]
+
+
+class ComplaintCreate(BaseModel):
+    category: ComplaintCategory
+    stop_id: str = Field(..., min_length=1, description="Bus stop ID or location name")
+    description: str = Field(..., min_length=5, max_length=1000, description="Details of the transport issue")
+    incident_time: Optional[str] = Field(default=None, description="Optional incident time (HH:MM or datetime)")
+    contact_phone: Optional[str] = Field(default=None, max_length=30, description="Optional citizen phone for follow-up")
+    contact_email: Optional[str] = Field(default=None, max_length=100, description="Optional citizen email for follow-up")
+
+    @field_validator("stop_id", "description")
+    @classmethod
+    def validate_non_empty_strings(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Field cannot be empty or whitespace only")
+        return v.strip()
+
+
+class ComplaintResponse(BaseModel):
+    reference_id: str
+    category: ComplaintCategory
+    stop_id: str
+    description: str
+    incident_time: Optional[str] = None
+    status: ComplaintStatus = "Received"
+    created_at: str
+    resolution_notes: Optional[str] = None
+    disclaimer: str = "DEMO CITIZEN PORTAL REPORT - For public transport demonstration purposes only."
+
+
+class ComplaintPublicItem(BaseModel):
+    reference_id: str
+    category: ComplaintCategory
+    stop_id: str
+    description: str
+    incident_time: Optional[str] = None
+    status: ComplaintStatus
+    created_at: str

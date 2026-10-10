@@ -109,10 +109,15 @@ def generate_demand_forecast(request: Optional[ForecastRequest] = None) -> Forec
     # Compute weather factor
     if weather_cond == "heavy_rain":
         concentration_factor = 1.4
-    elif weather_cond == "light_rain":
+        scenario.weather.travel_time_multiplier = max(scenario.weather.travel_time_multiplier, 1.25)
+    elif weather_cond in ("light_rain", "rainy"):
         concentration_factor = 1.2
+        scenario.weather.travel_time_multiplier = max(scenario.weather.travel_time_multiplier, 1.15)
+    elif weather_cond == "cloudy":
+        concentration_factor = 1.05
     else:
         concentration_factor = 1.0
+    scenario.weather.surge_concentration_factor = concentration_factor
 
     # Build time intervals
     horizon = programme.time_horizon

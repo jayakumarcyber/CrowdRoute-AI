@@ -7,7 +7,7 @@ side-by-side schedule simulation, and serves the interactive dashboard.
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,6 +17,9 @@ from fastapi.staticfiles import StaticFiles
 from backend.app.models import (
     AllocateRequest,
     AllocateResponse,
+    ComplaintCreate,
+    ComplaintPublicItem,
+    ComplaintResponse,
     ForecastRequest,
     ForecastResponse,
     HistoricalUploadResponse,
@@ -25,6 +28,11 @@ from backend.app.models import (
     SimulateRequest,
     SimulateResponse,
     UserDataValidationResult,
+)
+from backend.app.complaints import (
+    get_complaint,
+    list_public_complaints,
+    save_complaint,
 )
 from backend.app.forecast import generate_demand_forecast, load_default_scenario
 from backend.app.allocator import allocate_fixed_fleet
@@ -246,6 +254,50 @@ def post_simulate(request: SimulateRequest = SimulateRequest()) -> SimulateRespo
 
 
 # =====================================================================
+# PUBLIC COMPLAINTS & GRIEVANCE REPORTING API
+# =====================================================================
+
+@app.post("/api/complaints", response_model=ComplaintResponse, status_code=status.HTTP_201_CREATED, tags=["Complaints"])
+def create_complaint(complaint: ComplaintCreate) -> ComplaintResponse:
+    """Submits a citizen transport complaint and persists it in SQLite storage."""
+    try:
+        logger.info(f"Submitting complaint for stop '{complaint.stop_id}', category: {complaint.category}")
+        record = save_complaint(complaint)
+        return record
+    except Exception as exc:
+        logger.error(f"Failed to record complaint: {exc}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to submit complaint: {str(exc)}",
+        )
+
+
+@app.get("/api/complaints", response_model=List[ComplaintPublicItem], tags=["Complaints"])
+def get_complaints_list(limit: int = 50) -> List[ComplaintPublicItem]:
+    """Returns recent public complaints with citizen phone and email strictly masked for privacy."""
+    try:
+        return list_public_complaints(limit=max(1, min(100, limit)))
+    except Exception as exc:
+        logger.error(f"Failed to list complaints: {exc}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve complaints: {str(exc)}",
+        )
+
+
+@app.get("/api/complaints/{reference_id}", response_model=ComplaintResponse, tags=["Complaints"])
+def track_complaint(reference_id: str) -> ComplaintResponse:
+    """Tracks a specific complaint status by its reference code (e.g. CR-2026-XXXX)."""
+    record = get_complaint(reference_id)
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Complaint with reference ID '{reference_id}' was not found.",
+        )
+    return record
+
+
+# =====================================================================
 # DASHBOARD STATIC FILES MOUNT
 # =====================================================================
 
@@ -256,10 +308,15 @@ if not STATIC_DIR.exists():
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
+FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+if FRONTEND_DIST.exists():
+    app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets")), name="frontend-assets")
+
+
 @app.get("/", include_in_schema=False)
 def serve_dashboard():
-    """Serves the interactive CrowdRoute AI web dashboard."""
-    index_file = STATIC_DIR / "index.html"
-    if index_file.exists():
-        return FileResponse(str(index_file))
-    return PlainTextResponse("CrowdRoute AI API is running. Dashboard is being initialized.")
+    """Serves the CrowdRoute AI React application if built, or direct link info."""
+    dist_index = FRONTEND_DIST / "index.html"
+    if dist_index.exists():
+        return FileResponse(str(dist_index))
+    return PlainTextResponse("CrowdRoute AI FastAPI backend is running. React + TypeScript frontend is active at http://localhost:5173")

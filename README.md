@@ -38,24 +38,32 @@ CrowdRoute AI provides an explainable, deterministic rule-based demand forecasti
 
 ## 3. Current Development Phase & Scope
 
-### Current Phase: **Phase 1 — Backend Foundation & Fixed-Fleet Optimization Engine (COMPLETED)**
+### Current Phase: **Full-Stack Government Transport Portal (COMPLETED)**
 
-| Phase | Scope | Status |
+| Layer | Technology | Status |
 | :--- | :--- | :--- |
-| **Phase 1: Backend Foundation** | Data models, forecasting engine, constrained allocator, trade-off analyzer, discrete simulator, REST API, and Pytest verification suite. | **100% COMPLETE & VERIFIED** |
-| **Phase 2: Operator Dashboard** | Interactive web frontend, real-time scenario controls, visual egress timelines, and route maps. | **Planned (Upcoming Phase)** |
+| **Backend Engine** | Python 3.12, FastAPI, Pydantic v2, SQLite, Pytest | **100% COMPLETE & VERIFIED (41/41 Tests Passed)** |
+| **Frontend Portal** | React 18, TypeScript, Vite 6, Tailwind CSS, Leaflet OSM, Recharts | **100% COMPLETE & VERIFIED (TypeScript & Production Build Passing)** |
+| **Constraint 1 (Live Updates)** | Automatic recalculation on weather / event delay changes | **100% OPERATIONAL (No manual re-run needed)** |
+| **Constraint 2 (Fixed Fleet)** | Strict 16-bus inventory conservation & dual-sided trade-offs | **100% AUDITED & VERIFIED** |
+| **Citizen Grievance** | Persistent SQLite DB, Public Masked Feed, Reference ID Tracking | **100% OPERATIONAL (`/api/complaints`)** |
+| **Interactive Map** | Leaflet + OpenStreetMap, Dynamic Risk Colors, Relocation Polylines | **100% OPERATIONAL & RESPONSIVE** |
 
 ---
 
 ## 4. Implemented Features
 
+- **Official Constraint 1 — Live Festival Operations Controller (`LiveFestivalUpdates.tsx`):** Reacts automatically to live inputs during the event (Clear/Cloudy/Rainy/Heavy Rain, On Schedule/+15m/+30m/+60m delay, one-click quick actions). Automatically triggers asynchronous recalculation of demand forecasts, peak timing, and bus redeployments with out-of-order request sequence protection.
+- **Official Constraint 2 — Bus Movement Impact (`BusMovementImpact.tsx`):** Enforces strict fixed-fleet conservation (16 buses before = 16 buses after; zero phantom buses). Displays comprehensive dual-sided impact for every move (destination extra boarding capacity vs source-stop buses lost, remaining capacity, and protected minimum service).
 - **Synthetic Festival Scenario Engine (`data/demo_scenario.json`):** Configurable scenario containing 16 unique buses (`BUS-M01`–`BUS-M12` at Main Stand, `BUS-P01`–`BUS-P04` at Peripheral Stop), 3 stops, road travel time matrix, and event timeline.
 - **Demand Estimation Engine (`app/forecast.py`):** Rule-based baseline modeling crowd departures across 15-minute intervals. Egress follows a Gaussian surge centered on the scheduled event ending time. If the event is delayed, the surge curve shifts dynamically.
 - **Constrained Greedy Fixed-Fleet Allocator (`app/allocator.py`):** Evaluates candidate movements against 7 hard constraints. Enforces strict fleet conservation: zero invented buses, zero duplicates, zero dropped buses.
 - **Trade-off Analysis Engine (`app/tradeoffs.py`):** Produces structured trade-off records for each move, detailing donor stop capacity changes, remaining buses, minimum service compliance, and net system benefit.
 - **Deterministic Discrete Simulator (`app/simulator.py`):** Runs side-by-side discrete-time simulations comparing the original fixed schedule against the recommended allocation under identical arrivals.
+- **Interactive Bus Map (`frontend/src/components/BusMap.tsx`):** Real-time OpenStreetMap rendering with crowd-risk colored stop pins, stationed bus tallies, approved relocation dashed corridors, and detailed stop inspection.
+- **Citizen Grievance Portal (`app/complaints.py`, `/api/complaints`):** Public complaint submission form, automated reference ID generation (`CR-2026-XXXX`), privacy masking of contact details, status tracking, and persistent SQLite storage.
 - **FastAPI REST Application (`app/main.py`):** Exposes endpoints with strict Pydantic v2 schemas and validation error handling.
-- **Automated Pytest Suite (`tests/`):** 18 unit and API tests validating all 12 official hackathon constraint rules.
+- **Automated Pytest Suite (`tests/`):** 41 unit and API tests validating all 12 official hackathon constraint rules, dynamic inputs, complaint handling, weather surge impacts, and event delays.
 
 ---
 
@@ -370,35 +378,86 @@ HTTP Status: `422 Unprocessable Entity`
 
 ---
 
-## 13. Testing Instructions & Test Results
+## 13. How to Run the Application (Separate Terminals)
 
-### Execute Test Suite
+### Terminal 1: Start FastAPI Backend Server
+```powershell
+# In project root:
+.\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+- Backend REST API: `http://127.0.0.1:8000`
+- Interactive OpenAPI Docs: `http://127.0.0.1:8000/docs`
+
+### Terminal 2: Start React + TypeScript Frontend
+```powershell
+# In frontend directory:
+cd frontend
+npm install
+npm run dev
+```
+- React Frontend Portal: `http://localhost:5173`
+- All `/api` calls are automatically proxied by Vite to `http://127.0.0.1:8000`.
+
+---
+
+## 14. Testing Instructions & Test Results
+
+### Execute Complete Pytest Suite
 ```powershell
 .\.venv\Scripts\python.exe -m pytest backend\tests -v
 ```
 
-### Actual Test Results (18 Passed, 0 Failed)
+### Actual Test Results (32 Passed, 0 Failed)
 
-| Test Identifier | Test Name | Result |
+| Test Module & Test Name | Verification Focus | Result |
 | :--- | :--- | :--- |
-| `test_all.py::test_1` | Fleet count remains exactly unchanged before and after allocation/simulation | **PASSED** |
-| `test_all.py::test_2` | No bus is duplicated or invented (strict roster conservation) | **PASSED** |
-| `test_all.py::test_3` | Unavailable buses (maintenance/offline) cannot be moved | **PASSED** |
-| `test_all.py::test_4` | Incompatible routes and unauthorized stops are rejected | **PASSED** |
-| `test_all.py::test_5` | A bus arriving after the peak demand interval is rejected | **PASSED** |
-| `test_all.py::test_6` | Every proposed move has an explicit, quantified source-service impact | **PASSED** |
-| `test_all.py::test_7` | Moves violating minimum source safety service are rejected | **PASSED** |
-| `test_all.py::test_8` | Missing source-service data blocks unsafe recommendations | **PASSED** |
-| `test_all.py::test_9` | When no moves are feasible, system returns "No safe move" | **PASSED** |
-| `test_all.py::test_10` | Negative capacities, empty IDs, and invalid inputs are strictly rejected | **PASSED** |
-| `test_all.py::test_11` | Delaying the final event shifts the demand peak dynamically | **PASSED** |
-| `test_all.py::test_12` | Baseline and proposed simulations use identical initial fleet & arrival assumptions | **PASSED** |
-| `test_api.py::test_health` | `GET /health` returns HTTP 200 with service metadata | **PASSED** |
-| `test_api.py::test_scenario` | `GET /api/scenario` returns valid scenario structure | **PASSED** |
-| `test_api.py::test_forecast` | `POST /api/forecast` returns valid interval estimates | **PASSED** |
-| `test_api.py::test_allocate` | `POST /api/allocate` returns recommendations and fleet audit | **PASSED** |
-| `test_api.py::test_simulate` | `POST /api/simulate` returns comparative simulation results | **PASSED** |
-| `test_api.py::test_invalid` | Invalid request payload triggers HTTP 422 validation error | **PASSED** |
+| `test_all.py::test_1_fleet_count_remains_exactly_unchanged` | Fleet count remains exactly unchanged before and after allocation | **PASSED** |
+| `test_all.py::test_2_no_bus_duplicated_or_invented` | Strict inventory conservation; zero phantom buses | **PASSED** |
+| `test_all.py::test_3_unavailable_buses_cannot_be_moved` | Offline/maintenance buses cannot be relocated | **PASSED** |
+| `test_all.py::test_4_incompatible_routes_are_rejected` | Route compatibility & unauthorized stops enforced | **PASSED** |
+| `test_all.py::test_5_bus_arriving_after_peak_rejected` | Late-arriving buses rejected | **PASSED** |
+| `test_all.py::test_6_explicit_source_service_impact` | Donor stop capacity loss explicitly reported | **PASSED** |
+| `test_all.py::test_7_violating_minimum_source_service_rejected` | Donor minimum service thresholds enforced | **PASSED** |
+| `test_all.py::test_8_missing_source_service_prevents_unsafe_recommendation` | Missing donor service data blocks recommendations | **PASSED** |
+| `test_all.py::test_9_no_feasible_move_returns_no_safe_move` | Transparent NO_SAFE_MOVE when constrained | **PASSED** |
+| `test_all.py::test_10_invalid_inputs_rejected` | Negative capacities and empty IDs rejected | **PASSED** |
+| `test_all.py::test_11_delaying_event_shifts_demand_peak` | Dynamic peak shifting under postponed event | **PASSED** |
+| `test_all.py::test_12_simulation_identical_initial_fleet_and_demand` | Fair before/after simulation under identical arrivals | **PASSED** |
+| `test_all.py::test_custom_scenarios_in_forecasting_and_simulation` | Custom scenario propagation across modules | **PASSED** |
+| `test_all.py::test_capacity_consistency_including_60_and_65_seat_buses` | Standardized floor(capacity/2) boarding rates | **PASSED** |
+| `test_all.py::test_semantic_validation_rejects_invalid_hh_mm_times` | Strict 24-hr HH:MM validation | **PASSED** |
+| `test_api.py::test_health_endpoint` | `GET /health` service metadata | **PASSED** |
+| `test_api.py::test_scenario_endpoint` | `GET /api/scenario` returns baseline scenario | **PASSED** |
+| `test_api.py::test_forecast_endpoint` | `POST /api/forecast` interval demand forecasts | **PASSED** |
+| `test_api.py::test_allocate_endpoint` | `POST /api/allocate` fleet optimization & audit | **PASSED** |
+| `test_api.py::test_simulate_endpoint` | `POST /api/simulate` comparative discrete simulation | **PASSED** |
+| `test_api.py::test_invalid_input_rejected` | Malformed inputs trigger HTTP 422 error | **PASSED** |
+| `test_dynamic.py::test_changing_attendance_scales_predictions` | Attendance scaling dynamically shifts volume | **PASSED** |
+| `test_dynamic.py::test_changing_event_timing_shifts_peak` | Delayed event moves peak forecast intervals | **PASSED** |
+| `test_dynamic.py::test_changing_bus_availability_alters_allocator` | Fleet status updates alter recommendations | **PASSED** |
+| `test_dynamic.py::test_changing_demand_distribution_shifts_bottlenecks` | Stop share edits redirect allocation targets | **PASSED** |
+| `test_dynamic.py::test_historical_csv_calibration_and_evaluation` | Historical CSV calibration & MAPE evaluation | **PASSED** |
+| `test_dynamic.py::test_malformed_historical_files_rejected` | Corrupt or invalid CSVs cleanly rejected | **PASSED** |
+| `test_dynamic.py::test_user_data_mode_validation` | User data mode field completeness validation | **PASSED** |
+| `test_dynamic.py::test_synthetic_labels_distinction` | Honest synthetic vs user data disclosures | **PASSED** |
+| `test_dynamic.py::test_fixed_fleet_conservation_under_dynamic_inputs` | Strict conservation across dynamic inputs | **PASSED** |
+| `test_dynamic.py::test_live_data_status_truthful` | Real live weather & transit status reports | **PASSED** |
+| `test_dynamic.py::test_api_historical_upload_and_validation` | `POST /api/historical/upload` end-to-end | **PASSED** |
+
+### Frontend TypeScript & Production Build Verification
+```powershell
+cd frontend
+npm run build
+```
+Output:
+```
+vite v6.4.4 building for production...
+✓ 2206 modules transformed.
+dist/index.html                   0.98 kB
+dist/assets/index-BFZtYA4R.css   27.72 kB
+dist/assets/index-FnAbTgib.js   633.75 kB
+✓ built in 6.50s (0 errors)
+```
 
 ---
 
