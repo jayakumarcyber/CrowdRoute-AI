@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Save, RotateCcw, AlertTriangle, Check } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Save, RotateCcw, AlertTriangle, Check, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { Bus, ScenarioData, Stop, WeatherCondition } from '../types/api';
+import { formatTo12Hour, isValid24HourTime } from '../utils/timeFormat';
 
 interface ScenarioFormProps {
   scenario: ScenarioData | null;
@@ -16,10 +17,13 @@ export const ScenarioForm: React.FC<ScenarioFormProps> = ({
   isLoading = false,
 }) => {
   const [formData, setFormData] = useState<ScenarioData | null>(null);
+  const [autoSyncStatus, setAutoSyncStatus] = useState<'IDLE' | 'SYNCING' | 'SYNCED'>('SYNCED');
+  const debounceTimerRef = useRef<any>(null);
 
   useEffect(() => {
     if (scenario) {
       setFormData(JSON.parse(JSON.stringify(scenario)));
+      setAutoSyncStatus('SYNCED');
     }
   }, [scenario]);
 
@@ -90,6 +94,18 @@ export const ScenarioForm: React.FC<ScenarioFormProps> = ({
     });
   };
 
+  // Handle coordinates updates
+  const handleStopCoordChange = (stopId: string, field: 'latitude' | 'longitude', value: string) => {
+    const num = value.trim() ? parseFloat(value) : undefined;
+    setFormData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        stops: prev.stops.map((s) => (s.stop_id === stopId ? { ...s, [field]: num } : s)),
+      };
+    });
+  };
+
   // Handle bus edits
   const handleBusChange = (busId: string, field: keyof Bus, value: any) => {
     setFormData((prev) => {
@@ -101,25 +117,77 @@ export const ScenarioForm: React.FC<ScenarioFormProps> = ({
     });
   };
 
+  // PHASE 3: Automatic Scenario Pipeline Updates
+  // When user changes ANY relevant input, automatically update complete analysis pipeline without manual rerun
+  useEffect(() => {
+    if (!formData || !scenario) return;
+    // Don't auto-apply if identical to active scenario
+    if (JSON.stringify(formData) === JSON.stringify(scenario)) return;
+
+    // Validate essential inputs before triggering auto-pipeline
+    const isEndTimeValid = isValid24HourTime(formData.festival_programme.scheduled_event_end_time);
+    const isHorizonStartValid = isValid24HourTime(formData.festival_programme.time_horizon.start_time);
+    const isHorizonEndValid = isValid24HourTime(formData.festival_programme.time_horizon.end_time);
+    const sharesTotal = Object.values(formData.festival_programme.demand_distribution).reduce((sum, v) => sum + v, 0) * 100;
+    const isSharesValid = Math.abs(sharesTotal - 100) < 1.0;
+
+    if (!isEndTimeValid || !isHorizonStartValid || !isHorizonEndValid || !isSharesValid) {
+      return;
+    }
+
+    setAutoSyncStatus('SYNCING');
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      onApplyScenario(formData);
+      setAutoSyncStatus('SYNCED');
+    }, 600);
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [formData, scenario, onApplyScenario]);
+
   const sharesSum = Object.values(prog.demand_distribution).reduce((sum, v) => sum + v, 0) * 100;
   const isSharesSumValid = Math.abs(sharesSum - 100) < 0.5;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
     onApplyScenario(formData);
+    setAutoSyncStatus('SYNCED');
   };
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-6">
       
-      {/* HEADER */}
+      {/* HEADER WITH AUTO-SYNC STATUS */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-4 border-b border-slate-200">
         <div>
-          <h3 className="font-heading font-bold text-xl text-slate-900">
-            Scenario Parameters & Fleet Inventory
-          </h3>
-          <p className="text-xs text-slate-500">
-            Modify festival attendance, scheduled timings, stop shares, and bus availability to recalculate optimal redeployments dynamically.
+          <div className="flex items-center gap-2">
+            <h3 className="font-heading font-bold text-xl text-slate-900">
+              Scenario Parameters & Fleet Inventory
+            </h3>
+            {autoSyncStatus === 'SYNCING' || isLoading ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-sky-50 text-sky-800 border border-sky-200 text-[11px] font-semibold animate-pulse">
+                <RefreshCw className="w-3 h-3 animate-spin text-sky-600" />
+                <span>Updating pipeline...</span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-semibold">
+                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                <span>Auto-sync active</span>
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Modify festival attendance, scheduled timings, stop shares, and bus availability. All changes recalculate forecasts and allocations automatically.
           </p>
         </div>
         <button
@@ -150,9 +218,14 @@ export const ScenarioForm: React.FC<ScenarioFormProps> = ({
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-slate-700">
-              Scheduled Event End Time (HH:MM)
-            </label>
+            <div className="flex justify-between items-center">
+              <label className="text-xs font-semibold text-slate-700">
+                Scheduled Event End Time (HH:MM)
+              </label>
+              <span className="text-[11px] font-mono text-sky-700 font-bold">
+                {formatTo12Hour(prog.scheduled_event_end_time)}
+              </span>
+            </div>
             <input
               type="text"
               pattern="^(?:[01]\d|2[0-3]):[0-5]\d$"
@@ -220,9 +293,14 @@ export const ScenarioForm: React.FC<ScenarioFormProps> = ({
         {/* ROW 3: TIME HORIZON */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-slate-700">
-              Forecast Start Time (HH:MM)
-            </label>
+            <div className="flex justify-between items-center">
+              <label className="text-xs font-semibold text-slate-700">
+                Forecast Start Time (HH:MM)
+              </label>
+              <span className="text-[11px] font-mono text-sky-700 font-bold">
+                {formatTo12Hour(prog.time_horizon.start_time)}
+              </span>
+            </div>
             <input
               type="text"
               pattern="^(?:[01]\d|2[0-3]):[0-5]\d$"
@@ -234,9 +312,14 @@ export const ScenarioForm: React.FC<ScenarioFormProps> = ({
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-slate-700">
-              Forecast End Time (HH:MM)
-            </label>
+            <div className="flex justify-between items-center">
+              <label className="text-xs font-semibold text-slate-700">
+                Forecast End Time (HH:MM)
+              </label>
+              <span className="text-[11px] font-mono text-sky-700 font-bold">
+                {formatTo12Hour(prog.time_horizon.end_time)}
+              </span>
+            </div>
             <input
               type="text"
               pattern="^(?:[01]\d|2[0-3]):[0-5]\d$"
@@ -268,7 +351,7 @@ export const ScenarioForm: React.FC<ScenarioFormProps> = ({
                 Designated Bus Stops & Demand Distribution
               </h4>
               <p className="text-xs text-slate-500">
-                Configure passenger split percentages and minimum required safety buses at donor terminals.
+                Configure coordinates, passenger split percentages, and minimum required safety buses at donor terminals.
               </p>
             </div>
             <div className={`px-2.5 py-1 rounded text-xs font-bold font-mono border ${
@@ -288,6 +371,8 @@ export const ScenarioForm: React.FC<ScenarioFormProps> = ({
                   <th className="p-2.5">Location Name</th>
                   <th className="p-2.5">Min Reserve Buses</th>
                   <th className="p-2.5">Demand Share (%)</th>
+                  <th className="p-2.5">Latitude</th>
+                  <th className="p-2.5">Longitude</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-mono">
@@ -320,6 +405,26 @@ export const ScenarioForm: React.FC<ScenarioFormProps> = ({
                           />
                           <span className="font-sans text-slate-500">%</span>
                         </div>
+                      </td>
+                      <td className="p-2.5">
+                        <input
+                          type="number"
+                          step="0.0001"
+                          placeholder="e.g. 12.2285"
+                          value={stop.latitude !== undefined && stop.latitude !== null ? stop.latitude : ''}
+                          onChange={(e) => handleStopCoordChange(stop.stop_id, 'latitude', e.target.value)}
+                          className="w-24 px-2 py-1 rounded border border-slate-300 text-xs font-mono"
+                        />
+                      </td>
+                      <td className="p-2.5">
+                        <input
+                          type="number"
+                          step="0.0001"
+                          placeholder="e.g. 79.0700"
+                          value={stop.longitude !== undefined && stop.longitude !== null ? stop.longitude : ''}
+                          onChange={(e) => handleStopCoordChange(stop.stop_id, 'longitude', e.target.value)}
+                          className="w-24 px-2 py-1 rounded border border-slate-300 text-xs font-mono"
+                        />
                       </td>
                     </tr>
                   );

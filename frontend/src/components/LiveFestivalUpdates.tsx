@@ -16,6 +16,7 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { ScenarioData, WeatherCondition } from '../types/api';
+import { formatTo12Hour, parseAnyTimeToHHMM } from '../utils/timeFormat';
 
 export interface ActivityLogEntry {
   id: string;
@@ -44,6 +45,7 @@ export const LiveFestivalUpdates: React.FC<LiveFestivalUpdatesProps> = ({
 }) => {
   const [showLog, setShowLog] = useState<boolean>(false);
   const [customTime, setCustomTime] = useState<string>('');
+  const [timeInputError, setTimeInputError] = useState<string | null>(null);
 
   if (!scenario) return null;
 
@@ -100,16 +102,34 @@ export const LiveFestivalUpdates: React.FC<LiveFestivalUpdatesProps> = ({
     onUpdateScenario(updated, desc);
   };
 
-  // Custom time submit
+  // Custom time submit with flexible 12-hour AM/PM and 24-hour parsing
   const handleCustomTimeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(customTime)) return;
-    if (customTime === currentEndTime) return;
+    setTimeInputError(null);
+    if (!customTime.trim()) {
+      setTimeInputError('Please enter a time (e.g. 12:19 pm or 21:30)');
+      return;
+    }
+
+    const normalizedTime = parseAnyTimeToHHMM(customTime);
+    if (!normalizedTime) {
+      setTimeInputError('Please enter a valid time like 12:19 pm or 21:30');
+      return;
+    }
+
+    if (normalizedTime === currentEndTime) {
+      setTimeInputError(`Event is already scheduled for ${formatTo12Hour(normalizedTime)}`);
+      return;
+    }
 
     const updated: ScenarioData = JSON.parse(JSON.stringify(scenario));
-    updated.festival_programme.scheduled_event_end_time = customTime;
-    onUpdateScenario(updated, `Event conclusion manually updated to ${customTime}`);
+    updated.festival_programme.scheduled_event_end_time = normalizedTime;
+    onUpdateScenario(
+      updated,
+      `Event conclusion manually updated to ${formatTo12Hour(normalizedTime)} (${normalizedTime})`
+    );
     setCustomTime('');
+    setTimeInputError(null);
   };
 
   // Quick Action: Rain Started
@@ -131,7 +151,7 @@ export const LiveFestivalUpdates: React.FC<LiveFestivalUpdatesProps> = ({
     updated.festival_programme.scheduled_event_end_time = newTime;
     onUpdateScenario(
       updated,
-      `Quick Action: Final Event delayed by +30 Minutes (New conclusion: ${newTime})`
+      `Quick Action: Final Event delayed by +30 Minutes (New conclusion: ${formatTo12Hour(newTime)})`
     );
   };
 
@@ -151,8 +171,8 @@ export const LiveFestivalUpdates: React.FC<LiveFestivalUpdatesProps> = ({
   };
 
   return (
-    <section id="live-festival-updates" className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-sky-950 text-white rounded-2xl p-5 sm:p-6 shadow-lg border border-slate-700/60 space-y-5">
+    <section id="live-festival-updates" className="max-w-7xl mx-auto px-4 sm:px-6 py-2">
+      <div className="bg-[#0a1120] text-white rounded-xl p-5 sm:p-6 shadow-xl border border-slate-800 space-y-5">
         
         {/* TOP STATUS BAR: REAL-TIME BADGES */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-white/10">
@@ -179,7 +199,7 @@ export const LiveFestivalUpdates: React.FC<LiveFestivalUpdatesProps> = ({
             {/* Event End Time */}
             <div className="bg-slate-800/80 border border-white/10 rounded-lg px-3 py-1.5 flex items-center gap-2">
               <Clock className="w-3.5 h-3.5 text-sky-400" />
-              <span>Event End: <strong className="font-mono text-white text-sm">{currentEndTime}</strong></span>
+              <span>Event End: <strong className="font-mono text-white text-sm">{formatTo12Hour(currentEndTime)}</strong></span>
             </div>
 
             {/* Weather + Source */}
@@ -284,7 +304,7 @@ export const LiveFestivalUpdates: React.FC<LiveFestivalUpdatesProps> = ({
                 <Clock className="w-3.5 h-3.5 text-orange-400" />
                 <span>2. Event Conclusion Timing</span>
               </label>
-              <span className="text-[11px] font-mono text-sky-300">Current: {currentEndTime}</span>
+              <span className="text-[11px] font-mono text-sky-300">Current: {formatTo12Hour(currentEndTime)}</span>
             </div>
 
             <div className="flex flex-wrap gap-1.5">
@@ -297,7 +317,7 @@ export const LiveFestivalUpdates: React.FC<LiveFestivalUpdatesProps> = ({
                     : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-white/10'
                 }`}
               >
-                On Schedule (21:30)
+                On Schedule (9:30 PM)
               </button>
 
               <button
@@ -309,7 +329,7 @@ export const LiveFestivalUpdates: React.FC<LiveFestivalUpdatesProps> = ({
                     : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-white/10'
                 }`}
               >
-                +15 Min (21:45)
+                +15 Min (9:45 PM)
               </button>
 
               <button
@@ -321,7 +341,7 @@ export const LiveFestivalUpdates: React.FC<LiveFestivalUpdatesProps> = ({
                     : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-white/10'
                 }`}
               >
-                +30 Min (22:00)
+                +30 Min (10:00 PM)
               </button>
 
               <button
@@ -333,26 +353,37 @@ export const LiveFestivalUpdates: React.FC<LiveFestivalUpdatesProps> = ({
                     : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-white/10'
                 }`}
               >
-                +60 Min (22:30)
+                +60 Min (10:30 PM)
               </button>
             </div>
 
-            {/* Custom HH:MM */}
-            <form onSubmit={handleCustomTimeSubmit} className="flex gap-1.5 pt-1">
-              <input
-                type="text"
-                placeholder="Custom HH:MM (e.g. 21:50)"
-                pattern="^(?:[01]\d|2[0-3]):[0-5]\d$"
-                value={customTime}
-                onChange={(e) => setCustomTime(e.target.value)}
-                className="flex-1 px-2.5 py-1 rounded bg-slate-900 border border-slate-700 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-sky-500"
-              />
-              <button
-                type="submit"
-                className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-600 text-xs text-slate-200 font-semibold"
-              >
-                Set Time
-              </button>
+            {/* Custom time input accepting both 12-hour AM/PM and 24-hour */}
+            <form onSubmit={handleCustomTimeSubmit} className="space-y-1.5 pt-1">
+              <div className="flex gap-1.5">
+                <input
+                  type="text"
+                  placeholder="e.g. 12:19 pm or 21:30"
+                  value={customTime}
+                  onChange={(e) => {
+                    setCustomTime(e.target.value);
+                    if (timeInputError) setTimeInputError(null);
+                  }}
+                  className="flex-1 px-2.5 py-1.5 rounded bg-slate-900 border border-slate-700 text-xs font-mono text-white placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
+                />
+                <button
+                  type="submit"
+                  className="px-3 py-1.5 rounded bg-sky-700 hover:bg-sky-600 border border-sky-500/50 text-xs text-white font-semibold shadow-sm transition-all flex items-center gap-1"
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Set Time</span>
+                </button>
+              </div>
+              {timeInputError && (
+                <p className="text-[11px] text-red-300 font-medium flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+                  <span>{timeInputError}</span>
+                </p>
+              )}
             </form>
           </div>
 

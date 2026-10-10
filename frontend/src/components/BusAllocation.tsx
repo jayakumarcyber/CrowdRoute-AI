@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowRight, ShieldCheck, Bus, Clock, CheckCircle2, AlertCircle, HelpCircle } from 'lucide-react';
 import { AllocateResponse } from '../types/api';
+import { formatTo12Hour } from '../utils/timeFormat';
 
 interface BusAllocationProps {
   allocation: AllocateResponse | null;
@@ -36,7 +37,7 @@ export const BusAllocation: React.FC<BusAllocationProps> = ({
             Suggested Bus Changes
           </h2>
           <p className="text-sm text-slate-600 max-w-2xl">
-            Strategic relocation of existing buses to relieve heavy crowds at the busiest stand while strictly protecting minimum bus services at the donor stop.
+            Strategic relocation of existing buses to relieve heavy crowds at the busiest stand while strictly protecting minimum bus services at the source stop.
           </p>
         </div>
 
@@ -44,7 +45,7 @@ export const BusAllocation: React.FC<BusAllocationProps> = ({
           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold shadow-sm">
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
             <span>
-              All {fleet_audit.final_fleet_count} Buses Accounted For (Zero Added/Lost)
+              All {fleet_audit.final_fleet_count} Buses Accounted For (Fixed Fleet)
             </span>
           </div>
 
@@ -63,10 +64,10 @@ export const BusAllocation: React.FC<BusAllocationProps> = ({
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center space-y-2">
           <div className="inline-flex items-center gap-2 text-amber-800 font-bold text-base">
             <AlertCircle className="w-5 h-5 text-amber-600" />
-            <span>No Safe Bus Moves Feasible</span>
+            <span>No Safe Bus Moves Feasible Under Current Constraints</span>
           </div>
           <p className="text-sm text-amber-700 max-w-xl mx-auto">
-            {summary || 'All evaluated bus moves either left the origin stop with too few buses, or arrived too late after peak crowds passed.'}
+            {summary || 'All evaluated bus moves either left the source stop with too few buses, or arrived after peak crowds passed.'}
           </p>
         </div>
       ) : (
@@ -87,7 +88,7 @@ export const BusAllocation: React.FC<BusAllocationProps> = ({
                   </span>
                 </div>
                 <div className="text-xs text-slate-500 font-mono">
-                  Busiest Window: {move.target_peak_interval}
+                  Busiest Time: {formatTo12Hour(move.target_peak_interval)}
                 </div>
               </div>
 
@@ -102,39 +103,63 @@ export const BusAllocation: React.FC<BusAllocationProps> = ({
               <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 flex justify-between items-center text-xs text-slate-600 font-mono">
                 <div className="flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Departs: <strong className="text-slate-900">{move.departure_time}</strong></span>
+                  <span>Departs: <strong className="text-slate-900">{formatTo12Hour(move.departure_time)}</strong></span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span>Arrives Destination: <strong className="text-slate-900">{move.estimated_arrival_time}</strong></span>
+                  <span>Arrives: <strong className="text-slate-900">{formatTo12Hour(move.estimated_arrival_time)}</strong></span>
                 </div>
               </div>
 
-              {/* BENEFIT VS TRADE-OFF */}
+              {/* BENEFIT VS TRADE-OFF WITH SOURCE SERVICE AND MINIMUM GUARANTEE */}
               <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2 text-xs">
-                <div className="text-emerald-700 font-semibold flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-                  <span>Extra Passenger Capacity at Destination: +{move.estimated_destination_benefit} passengers/window</span>
+                <div className="text-emerald-700 font-semibold flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                    <span>Benefit at Destination ({move.destination_stop_id}):</span>
+                  </span>
+                  <span className="font-mono font-bold text-emerald-800">+{move.estimated_destination_benefit} extra passenger capacity</span>
                 </div>
-                <div className="text-slate-700 flex items-start gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1 flex-shrink-0"></span>
-                  <span><strong>Stop Losing a Bus ({move.source_stop_id}):</strong> {move.source_service_impact_description}</span>
+                
+                <div className="text-slate-700 space-y-1 pt-1 border-t border-slate-200/70">
+                  <div className="flex justify-between items-center">
+                    <span className="flex items-center gap-1.5 font-semibold text-slate-800">
+                      <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                      <span>Service Reduced at Source Stop ({move.source_stop_id}):</span>
+                    </span>
+                    <span className="font-mono font-bold text-slate-900">{move.source_service_after} buses remaining</span>
+                  </div>
+                  <div className="flex justify-between items-center text-[11px] text-slate-600">
+                    <span>Source Minimum Service:</span>
+                    <span className="inline-flex items-center gap-1 font-bold text-emerald-700">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      <span>Satisfied ({move.source_service_after} buses ≥ safety minimum)</span>
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              {/* CONSTRAINTS AUDIT LIST */}
-              <div className="space-y-1 pt-1 text-xs text-slate-500">
-                <div className="font-semibold text-slate-700 text-[11px] uppercase tracking-wider">
-                  Safety & Conservation Checks Passed:
+              {/* WHY IS THIS RECOMMENDED EXPANDABLE DETAILS */}
+              <details className="text-xs text-slate-500 pt-1">
+                <summary className="font-semibold text-slate-700 cursor-pointer hover:text-sky-700">
+                  Why is this recommended? (Operational safety checks)
+                </summary>
+                <div className="space-y-1 text-[11px] mt-2 pt-2 border-t border-slate-100">
+                  <p className="text-slate-600 italic">
+                    "{move.destination_need_reason}"
+                  </p>
+                  <p className="text-slate-600 italic">
+                    "{move.source_service_impact_description}"
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 pt-1">
+                    {move.constraints_passed.map((c, i) => (
+                      <div key={i} className="flex items-center gap-1 text-slate-600">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600 flex-shrink-0" />
+                        <span className="truncate">{c.split(':')[0]}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 gap-1 text-[11px]">
-                  {move.constraints_passed.slice(0, 4).map((c, i) => (
-                    <div key={i} className="flex items-center gap-1 text-slate-600">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-600 flex-shrink-0" />
-                      <span className="truncate">{c.split(':')[0]}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              </details>
 
             </div>
           ))}

@@ -288,6 +288,68 @@ def generate_sample_historical_csv() -> str:
     return "\n".join(rows) + "\n"
 
 
+def generate_sample_historical_excel() -> bytes:
+    """Generates standard Excel (.xlsx) workbook bytes representing synthetic previous festival passenger records."""
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Festival Historical Crowds"
+
+    headers = ["time", "stop_id", "passengers", "session_label", "notes"]
+    ws.append(headers)
+
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="1E3A8A", end_color="1E3A8A", fill_type="solid")
+
+    for col_num, _ in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_num)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    sample_rows = [
+        ["21:00", "STOP_MAIN", 3500, "Maha Deepam Festival 2025", "Synthetic demo reference observation"],
+        ["21:00", "STOP_PERIPHERAL", 20, "Maha Deepam Festival 2025", "Synthetic demo reference observation"],
+        ["21:00", "STOP_EAST_GATE", 380, "Maha Deepam Festival 2025", "Synthetic demo reference observation"],
+        ["21:15", "STOP_MAIN", 6500, "Maha Deepam Festival 2025", "Synthetic demo reference observation"],
+        ["21:15", "STOP_PERIPHERAL", 35, "Maha Deepam Festival 2025", "Synthetic demo reference observation"],
+        ["21:15", "STOP_EAST_GATE", 710, "Maha Deepam Festival 2025", "Synthetic demo reference observation"],
+        ["21:30", "STOP_MAIN", 8100, "Maha Deepam Festival 2025", "Peak temple ceremony conclusion surge"],
+        ["21:30", "STOP_PERIPHERAL", 45, "Maha Deepam Festival 2025", "Peak temple ceremony conclusion surge"],
+        ["21:30", "STOP_EAST_GATE", 850, "Maha Deepam Festival 2025", "Peak temple ceremony conclusion surge"],
+        ["21:45", "STOP_MAIN", 6200, "Maha Deepam Festival 2025", "Post-peak outbound egress"],
+        ["21:45", "STOP_PERIPHERAL", 30, "Maha Deepam Festival 2025", "Post-peak outbound egress"],
+        ["21:45", "STOP_EAST_GATE", 650, "Maha Deepam Festival 2025", "Post-peak outbound egress"],
+        ["22:00", "STOP_MAIN", 3400, "Maha Deepam Festival 2025", "Tapering egress"],
+        ["22:00", "STOP_PERIPHERAL", 20, "Maha Deepam Festival 2025", "Tapering egress"],
+        ["22:00", "STOP_EAST_GATE", 360, "Maha Deepam Festival 2025", "Tapering egress"],
+        ["22:15", "STOP_MAIN", 1600, "Maha Deepam Festival 2025", "Tapering egress"],
+        ["22:15", "STOP_PERIPHERAL", 10, "Maha Deepam Festival 2025", "Tapering egress"],
+        ["22:15", "STOP_EAST_GATE", 170, "Maha Deepam Festival 2025", "Tapering egress"],
+        ["22:30", "STOP_MAIN", 800, "Maha Deepam Festival 2025", "Late night clearance"],
+        ["22:30", "STOP_PERIPHERAL", 6, "Maha Deepam Festival 2025", "Late night clearance"],
+        ["22:30", "STOP_EAST_GATE", 70, "Maha Deepam Festival 2025", "Late night clearance"],
+        ["22:45", "STOP_MAIN", 500, "Maha Deepam Festival 2025", "Residual terminal clearance"],
+        ["22:45", "STOP_PERIPHERAL", 5, "Maha Deepam Festival 2025", "Residual terminal clearance"],
+        ["22:45", "STOP_EAST_GATE", 40, "Maha Deepam Festival 2025", "Residual terminal clearance"],
+    ]
+
+    for row in sample_rows:
+        ws.append(row)
+
+    ws.column_dimensions["A"].width = 12
+    ws.column_dimensions["B"].width = 18
+    ws.column_dimensions["C"].width = 14
+    ws.column_dimensions["D"].width = 28
+    ws.column_dimensions["E"].width = 40
+
+    out_stream = io.BytesIO()
+    wb.save(out_stream)
+    return out_stream.getvalue()
+
+
 def calculate_actual_vs_predicted(
     historical_records: List[HistoricalRecord],
     predicted_intervals: List[Any],

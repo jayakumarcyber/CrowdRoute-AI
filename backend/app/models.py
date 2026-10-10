@@ -52,6 +52,8 @@ class Stop(BaseModel):
     min_service_buses: int = Field(..., ge=0, description="Minimum buses required to maintain baseline safety/service")
     baseline_scheduled_buses: int = Field(..., ge=0, description="Scheduled buses at baseline")
     supported_routes: List[str] = Field(default_factory=list, description="Permitted route codes at this stop")
+    latitude: Optional[float] = Field(default=None, ge=-90.0, le=90.0, description="Configurable latitude coordinate")
+    longitude: Optional[float] = Field(default=None, ge=-180.0, le=180.0, description="Configurable longitude coordinate")
 
     @field_validator("stop_id")
     @classmethod

@@ -62,29 +62,37 @@ export const HistoricalUpload: React.FC<HistoricalUploadProps> = ({
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-4 border-b border-slate-200">
         <div>
           <h3 className="font-heading font-bold text-xl text-slate-900">
-            Historical Festival Data Upload & Calibration
+            Past Crowd Data & Historical Calibration
           </h3>
           <p className="text-xs text-slate-500">
-            Upload previous festival passenger counts or ticketing logs (CSV / Excel .xlsx) to drive empirical interval departure curves.
+            Upload past festival passenger counts (CSV / Excel) or load our synthetic demo dataset to calibrate interval departure curves.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={onLoadSampleCsv}
             disabled={isLoading}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-semibold shadow-sm"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-sky-700 hover:bg-sky-800 text-white text-xs font-semibold shadow-sm"
           >
-            <Database className="w-3.5 h-3.5 text-sky-600" />
-            <span>Load Sample CSV</span>
+            <Database className="w-3.5 h-3.5" />
+            <span>Load Sample Data</span>
           </button>
           <a
             href="/api/historical/sample"
             download="sample_festival_historical_data.csv"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-semibold shadow-sm"
           >
             <Download className="w-3.5 h-3.5 text-slate-500" />
-            <span>Template</span>
+            <span>Download CSV</span>
+          </a>
+          <a
+            href="/api/historical/sample.xlsx"
+            download="sample_festival_historical_data.xlsx"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-semibold shadow-sm"
+          >
+            <Download className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Download Excel (.xlsx)</span>
           </a>
         </div>
       </div>
@@ -113,10 +121,10 @@ export const HistoricalUpload: React.FC<HistoricalUploadProps> = ({
           <UploadCloud className="w-7 h-7" />
         </div>
         <h4 className="font-bold text-sm text-slate-900">
-          Upload Historical Festival Data (CSV or Excel)
+          Upload Past Festival Records (CSV or Excel)
         </h4>
         <p className="text-xs text-slate-500 mt-1">
-          Expected columns: <code className="bg-slate-200 px-1 py-0.5 rounded text-slate-800">time</code> (HH:MM), <code className="bg-slate-200 px-1 py-0.5 rounded text-slate-800">stop_id</code>, <code className="bg-slate-200 px-1 py-0.5 rounded text-slate-800">passengers</code>
+          Required columns: <code className="bg-slate-200 px-1 py-0.5 rounded text-slate-800">time</code> (HH:MM), <code className="bg-slate-200 px-1 py-0.5 rounded text-slate-800">stop_id</code>, <code className="bg-slate-200 px-1 py-0.5 rounded text-slate-800">passengers</code>
         </p>
         <button
           type="button"
@@ -126,7 +134,7 @@ export const HistoricalUpload: React.FC<HistoricalUploadProps> = ({
           }}
           className="mt-4 px-4 py-1.5 rounded bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-semibold shadow-sm"
         >
-          Select Local File
+          Select File from Computer
         </button>
       </div>
 
@@ -141,7 +149,7 @@ export const HistoricalUpload: React.FC<HistoricalUploadProps> = ({
       {/* UPLOAD STATUS PANEL */}
       {uploadResult && (
         <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-3">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-2 border-b border-slate-200">
             <div className="flex items-center gap-2">
               <span
                 className={`px-2 py-0.5 rounded text-[11px] font-bold uppercase ${
@@ -156,9 +164,16 @@ export const HistoricalUpload: React.FC<HistoricalUploadProps> = ({
                 {uploadResult.filename}
               </span>
             </div>
-            <span className="text-xs text-slate-500 font-mono">
-              {uploadResult.records.length} records ingested
-            </span>
+
+            {uploadResult.filename.toLowerCase().includes('sample') ? (
+              <span className="px-2.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-300 text-xs font-bold">
+                Calibrated with Synthetic Historical Demo Data
+              </span>
+            ) : (
+              <span className="px-2.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs font-bold">
+                Calibrated with User Historical Upload
+              </span>
+            )}
           </div>
 
           <div className="text-xs text-slate-600 space-y-1">
@@ -166,9 +181,20 @@ export const HistoricalUpload: React.FC<HistoricalUploadProps> = ({
               Valid rows: <strong>{uploadResult.valid_rows}</strong> • Rejected rows: <strong>{uploadResult.invalid_rows_count}</strong> • Total historical passengers: <strong>{uploadResult.total_passenger_count.toLocaleString()}</strong>
             </div>
             <div className="font-mono text-[11px] text-slate-500">
-              Coverage: {uploadResult.stop_ids_found.join(', ')} • Mapped: {JSON.stringify(uploadResult.column_mapping)}
+              Coverage: {uploadResult.stop_ids_found.join(', ')} • {uploadResult.records.length} time intervals ingested
             </div>
           </div>
+
+          {/* SAMPLES NOTICE IF DEMO DATA */}
+          {uploadResult.filename.toLowerCase().includes('sample') && (
+            <div className="bg-amber-50/70 border border-amber-200 rounded p-2.5 text-xs text-amber-800 space-y-0.5">
+              <strong className="block font-bold">Synthetic Historical Dataset Disclosure:</strong>
+              <span>
+                These sample records are synthetic demonstration data based on the Maha Deepam closing ceremony. 
+                They are used to test empirical interval departure calibrations without exposing real citizen ticketing data.
+              </span>
+            </div>
+          )}
 
           {uploadResult.validation_errors && uploadResult.validation_errors.length > 0 && (
             <div className="bg-amber-50 border border-amber-200 rounded p-2.5 text-xs text-amber-800 space-y-1">

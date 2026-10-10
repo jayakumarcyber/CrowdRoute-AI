@@ -9,7 +9,7 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile, status
+from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
@@ -39,6 +39,7 @@ from backend.app.allocator import allocate_fixed_fleet
 from backend.app.simulator import compare_schedules
 from backend.app.historical import (
     generate_sample_historical_csv,
+    generate_sample_historical_excel,
     parse_and_validate_historical_file,
 )
 from backend.app.live_data import get_live_data_summary
@@ -176,13 +177,31 @@ async def upload_historical_file(
 
 
 @app.get("/api/historical/sample", tags=["Historical Data"])
-def get_sample_historical_csv() -> PlainTextResponse:
-    """Provides a verified sample CSV representing previous festival passenger boarding counts."""
+def get_sample_historical_csv(format: Optional[str] = None) -> Response:
+    """Provides a verified sample CSV or Excel representing previous festival passenger boarding counts."""
+    if format and format.lower() in ("xlsx", "excel"):
+        excel_bytes = generate_sample_historical_excel()
+        return Response(
+            content=excel_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": 'attachment; filename="sample_festival_historical_data.xlsx"'},
+        )
     csv_text = generate_sample_historical_csv()
     return PlainTextResponse(
         content=csv_text,
         media_type="text/csv",
         headers={"Content-Disposition": 'attachment; filename="sample_festival_historical_data.csv"'},
+    )
+
+
+@app.get("/api/historical/sample.xlsx", tags=["Historical Data"])
+def get_sample_historical_excel_direct() -> Response:
+    """Provides a verified sample Excel (.xlsx) file representing previous festival passenger boarding counts."""
+    excel_bytes = generate_sample_historical_excel()
+    return Response(
+        content=excel_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="sample_festival_historical_data.xlsx"'},
     )
 
 

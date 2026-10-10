@@ -1,17 +1,19 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { HeroSection } from '../components/HeroSection';
+import { AdministrativeStepBar } from '../components/AdministrativeStepBar';
 import { LiveFestivalUpdates, ActivityLogEntry } from '../components/LiveFestivalUpdates';
 import { SummaryMetrics } from '../components/SummaryMetrics';
 import { CrowdForecast } from '../components/CrowdForecast';
 import { BusMap } from '../components/BusMap';
 import { BusMovementImpact } from '../components/BusMovementImpact';
+import { BusTimetable } from '../components/BusTimetable';
 import {
   AllocateResponse,
   ForecastResponse,
   OperationalMode,
   ScenarioData,
 } from '../types/api';
-import { CheckCircle2, Shield, Users, Bus, AlertCircle, ArrowRight } from 'lucide-react';
+import { CheckCircle2, Shield, Users, Bus, AlertCircle, ArrowRight, Activity, MapPin } from 'lucide-react';
 
 interface HomePageProps {
   scenario: ScenarioData | null;
@@ -46,6 +48,8 @@ export const HomePage: React.FC<HomePageProps> = ({
   lastUpdateTimestamp = '',
   isLoading,
 }) => {
+  const [selectedHierarchyStop, setSelectedHierarchyStop] = useState<string>('STOP_MAIN');
+
   const scrollTo = (id: string) => {
     const el = document.getElementById(id);
     if (el) {
@@ -54,15 +58,38 @@ export const HomePage: React.FC<HomePageProps> = ({
   };
 
   return (
-    <div className="space-y-4">
-      {/* 1. HERO SECTION */}
+    <div className="space-y-6 bg-slate-100/60 pb-12">
+      
+      {/* 1. ADMINISTRATIVE STEP FILTER BAR (MATCHING SCREENSHOT 3) */}
+      <AdministrativeStepBar
+        stops={scenario?.stops || []}
+        selectedStopId={selectedHierarchyStop}
+        onSelectStop={(id) => {
+          setSelectedHierarchyStop(id);
+          scrollTo('bus-map-section');
+        }}
+      />
+
+      {/* 2. HERO SECTION WITH AERIAL TRANSIT BACKDROP (SCREENSHOT 2 & 3) */}
       <HeroSection
         onScrollToForecast={() => scrollTo('crowd-forecast')}
-        onScrollToAllocation={() => scrollTo('bus-movement-impact')}
+        onScrollToAllocation={() => scrollTo('bus-allocation')}
+        onScrollToMap={() => scrollTo('bus-map-section')}
         onReportProblem={onNavigateComplaints}
       />
 
-      {/* 2. OFFICIAL CONSTRAINT 1: LIVE FESTIVAL OPERATIONS CONTROLLER */}
+      {/* 3. DARK 4-CARD SUMMARY METRICS STRIP + TELEMETRY CARD (SCREENSHOT 2) */}
+      <SummaryMetrics
+        scenario={scenario}
+        forecast={forecast}
+        systemMode={systemMode}
+        onSetMode={onSetMode}
+        onResetDefaults={onResetDefaults}
+        onRefresh={onRefresh}
+        isLoading={isLoading}
+      />
+
+      {/* 4. LIVE FESTIVAL OPERATIONS CONTROLLER */}
       {onLiveScenarioUpdate && (
         <LiveFestivalUpdates
           scenario={scenario}
@@ -74,35 +101,60 @@ export const HomePage: React.FC<HomePageProps> = ({
         />
       )}
 
-      {/* 3. SIMPLE INFORMATION STRIP */}
-      <SummaryMetrics
-        scenario={scenario}
-        forecast={forecast}
-        systemMode={systemMode}
-        onSetMode={onSetMode}
-        onResetDefaults={onResetDefaults}
-        onRefresh={onRefresh}
-        isLoading={isLoading}
-      />
+      {/* 5. INTERACTIVE BUS STOP & ROUTE MAP (SCREENSHOT 1 3-COLUMN LAYOUT) */}
+      <section id="bus-map-section" className="max-w-7xl mx-auto px-4 sm:px-6 pt-2">
+        <div className="space-y-2 mb-3">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-900 text-[11px] font-bold uppercase tracking-wider font-mono">
+            <span>TRANSIT GIS & FLEET POSITIONING</span>
+          </div>
+          <h2 className="font-heading text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            Interactive Bus Stand & Fleet Tracking Map
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-600">
+            Real-time visual monitoring of all 16 buses, station bay capacities, and recommended relocation transfer lines.
+          </p>
+        </div>
 
-      {/* 4. CROWD FORECAST PREVIEW */}
-      <CrowdForecast
-        forecast={forecast}
-        stops={scenario?.stops || []}
-        onViewDetailedTable={() => onNavigateDashboard('forecast-table')}
-      />
-
-      {/* 5. INTERACTIVE BUS STOP & ROUTE MAP */}
-      <section id="bus-map-section" className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         <BusMap
           stops={scenario?.stops || []}
           fleet={scenario?.fleet || []}
           forecast={forecast}
           allocation={allocation}
+          scenario={scenario}
         />
       </section>
 
-      {/* 6. OFFICIAL CONSTRAINT 2: FIXED FLEET WITH VISIBLE SERVICE TRADE-OFFS */}
+      {/* 6. CROWD FORECAST PREVIEW */}
+      <div id="crowd-forecast">
+        <CrowdForecast
+          forecast={forecast}
+          stops={scenario?.stops || []}
+          onViewDetailedTable={() => onNavigateDashboard('forecast-table')}
+        />
+      </div>
+
+      {/* 7. OPERATIONAL BUS TIMETABLE */}
+      <section id="bus-timetable-section" className="max-w-7xl mx-auto px-4 sm:px-6">
+        <div className="space-y-2 mb-3">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-900 text-[11px] font-bold uppercase tracking-wider font-mono">
+            <span>OPERATIONAL TIMETABLE</span>
+          </div>
+          <h2 className="font-heading text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            Bus Timetable & Fleet Status
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-600">
+            Chronological departure times, estimated arrival windows, and full 16-bus fixed roster status.
+          </p>
+        </div>
+
+        <BusTimetable
+          allocation={allocation}
+          forecast={forecast}
+          scenario={scenario}
+        />
+      </section>
+
+      {/* 8. OFFICIAL CONSTRAINT 2: FIXED FLEET WITH VISIBLE SERVICE TRADE-OFFS */}
       <div id="bus-allocation">
         <BusMovementImpact
           allocation={allocation}
@@ -112,18 +164,76 @@ export const HomePage: React.FC<HomePageProps> = ({
         />
       </div>
 
-      {/* 6. REPORT A TRANSPORT PROBLEM QUICK CITIZEN BANNER */}
-      <section id="complaint-banner" className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        <div className="bg-gradient-to-r from-orange-50 via-amber-50 to-orange-100 border border-orange-200 rounded-2xl p-6 sm:p-8 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+      {/* 9. HOW IT WORKS: 3 SIMPLE STEPS */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6">
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 space-y-6 shadow-sm">
+          <div className="text-center max-w-2xl mx-auto space-y-1">
+            <span className="text-xs font-bold text-blue-700 uppercase tracking-wider font-mono">
+              THREE-STEP OPERATIONAL PIPELINE
+            </span>
+            <h3 className="font-heading text-2xl font-bold text-slate-900">
+              How CrowdRoute AI Works
+            </h3>
+            <p className="text-xs text-slate-600">
+              Transparent, explainable decision support designed for municipal transport officers and festival dispatchers.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {/* STEP 1 */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 shadow-sm space-y-2">
+              <div className="w-9 h-9 rounded-lg bg-blue-100 text-blue-800 font-bold flex items-center justify-center text-sm font-mono">
+                1
+              </div>
+              <h4 className="font-heading font-bold text-base text-slate-900">
+                Predict Crowd Surge
+              </h4>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Calculates expected passenger surges for each 15-minute window based on the scheduled closing ceremony and weather conditions.
+              </p>
+            </div>
+
+            {/* STEP 2 */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 shadow-sm space-y-2">
+              <div className="w-9 h-9 rounded-lg bg-amber-100 text-amber-800 font-bold flex items-center justify-center text-sm font-mono">
+                2
+              </div>
+              <h4 className="font-heading font-bold text-base text-slate-900">
+                Plan Fixed Fleet Relocations
+              </h4>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Identifies idle buses at peripheral stands and recommends safe relocations to crowded temple stands without violating safety minimums.
+              </p>
+            </div>
+
+            {/* STEP 3 */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 shadow-sm space-y-2">
+              <div className="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-sm font-mono">
+                3
+              </div>
+              <h4 className="font-heading font-bold text-base text-slate-900">
+                Monitor Live Updates Automatically
+              </h4>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Automatically recalculates forecasts and recommendations when rain begins or events run late, requiring zero manual re-runs.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 10. REPORT A TRANSPORT PROBLEM QUICK CITIZEN BANNER */}
+      <section id="complaint-banner" className="max-w-7xl mx-auto px-4 sm:px-6">
+        <div className="bg-[#0b1329] border border-slate-800 text-white rounded-2xl p-6 sm:p-8 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="space-y-2 max-w-2xl">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-200/70 text-orange-900 text-xs font-bold uppercase tracking-wider">
-              <AlertCircle className="w-3.5 h-3.5 text-orange-700" />
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-bold uppercase tracking-wider font-mono">
+              <AlertCircle className="w-3.5 h-3.5 text-red-400" />
               <span>CITIZEN FEEDBACK & GRIEVANCE REPORTING</span>
             </div>
-            <h3 className="font-heading text-2xl font-bold text-slate-900 tracking-tight">
+            <h3 className="font-heading text-2xl font-bold text-white tracking-tight">
               Facing Overcrowding or Bus Delays at the Festival?
             </h3>
-            <p className="text-sm text-slate-700 leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
               Submit a quick report to help transport controllers adjust bus movements. Receive an instant tracking reference code with no complex signup.
             </p>
           </div>
@@ -131,106 +241,15 @@ export const HomePage: React.FC<HomePageProps> = ({
           <div className="flex flex-col sm:flex-row gap-3 flex-shrink-0">
             <button
               onClick={onNavigateComplaints}
-              className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-semibold text-sm shadow-md shadow-orange-600/20 transition-all hover:translate-y-[-1px]"
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-red-600/30 transition-all hover:translate-y-[-1px]"
             >
-              <span>Report a Transport Problem</span>
+              <span>Report a Problem</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         </div>
       </section>
 
-      {/* 5. ABOUT CIVICPULSE / PORTAL ETHICS & ARCHITECTURE */}
-      <section id="about" className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-sm space-y-6">
-          <div className="flex items-center gap-3 pb-4 border-b border-slate-200">
-            <div className="w-10 h-10 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center font-bold text-lg">
-              🏛️
-            </div>
-            <div>
-              <h3 className="font-heading font-bold text-xl text-slate-900">
-                About CrowdRoute AI Decision Support System
-              </h3>
-              <p className="text-xs text-sky-700 font-semibold">
-                Designed for SAKTHI HACKFEST'26 — Generative AI Domain
-              </p>
-            </div>
-          </div>
-
-          <p className="text-sm text-slate-700 leading-relaxed max-w-4xl">
-            <strong>CrowdRoute AI</strong> provides municipal transport authorities with actionable, transparent recommendations during high-consequence temple festivals and mass gatherings. Unlike black-box models, all decisions strictly preserve physical constraints:
-          </p>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-            
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex gap-3.5">
-              <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold flex-shrink-0 text-xs">
-                ✓
-              </div>
-              <div>
-                <strong className="text-sm text-slate-900 block mb-1">
-                  Zero-Phantom Fleet Conservation
-                </strong>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  The active bus fleet is strictly conserved before and after optimization. No additional buses are invented, duplicated, or assumed out of nowhere.
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex gap-3.5">
-              <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold flex-shrink-0 text-xs">
-                ✓
-              </div>
-              <div>
-                <strong className="text-sm text-slate-900 block mb-1">
-                  Donor Terminal Safety Reserves
-                </strong>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  Every donor stop maintains configured minimum service buses to ensure passenger safety and prevent transferring crowd panics elsewhere.
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex gap-3.5">
-              <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold flex-shrink-0 text-xs">
-                ✓
-              </div>
-              <div>
-                <strong className="text-sm text-slate-900 block mb-1">
-                  Standardized Boarding Capacity
-                </strong>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  All deficit reductions and discrete simulations consistently enforce <code className="font-mono bg-slate-200 px-1 py-0.5 rounded text-slate-800">floor(capacity / 2)</code> per 15-minute interval for realistic dispatch cycles.
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex gap-3.5">
-              <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold flex-shrink-0 text-xs">
-                ✓
-              </div>
-              <div>
-                <strong className="text-sm text-slate-900 block mb-1">
-                  Transparent Data Provenance
-                </strong>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  Honest disclosures distinguish verified synthetic demo baselines from user-supplied overrides and historical observations.
-                </p>
-              </div>
-            </div>
-
-          </div>
-
-          <div className="pt-4 flex justify-end">
-            <button
-              onClick={() => onNavigateDashboard('scenario')}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-sm"
-            >
-              <span>Open Operator Management Console →</span>
-            </button>
-          </div>
-        </div>
-      </section>
     </div>
   );
 };

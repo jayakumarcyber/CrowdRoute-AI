@@ -36,7 +36,9 @@
       "description": "Primary transit hub located 400m from main temple gate. Primary exit bottleneck.",
       "min_service_buses": 2,
       "baseline_scheduled_buses": 12,
-      "supported_routes": ["ROUTE-MAIN-TOWN", "ROUTE-CROSS-REGIONAL", "ROUTE-INTERCITY"]
+      "supported_routes": ["ROUTE-MAIN-TOWN", "ROUTE-CROSS-REGIONAL", "ROUTE-INTERCITY"],
+      "latitude": 12.2285,
+      "longitude": 79.0700
     },
     {
       "stop_id": "STOP_PERIPHERAL",
@@ -44,7 +46,9 @@
       "description": "Secondary transit stop 2.0 km north of town center with 4 idle scheduled buses.",
       "min_service_buses": 1,
       "baseline_scheduled_buses": 4,
-      "supported_routes": ["ROUTE-NORTH-BYPASS", "ROUTE-MAIN-TOWN", "ROUTE-CROSS-REGIONAL"]
+      "supported_routes": ["ROUTE-NORTH-BYPASS", "ROUTE-MAIN-TOWN", "ROUTE-CROSS-REGIONAL"],
+      "latitude": 12.2450,
+      "longitude": 79.0680
     },
     {
       "stop_id": "STOP_EAST_GATE",
@@ -52,7 +56,9 @@
       "description": "Pedestrian feeder corridor leading towards eastern residential and parking zones.",
       "min_service_buses": 0,
       "baseline_scheduled_buses": 0,
-      "supported_routes": ["ROUTE-MAIN-TOWN", "ROUTE-CROSS-REGIONAL"]
+      "supported_routes": ["ROUTE-MAIN-TOWN", "ROUTE-CROSS-REGIONAL"],
+      "latitude": 12.2260,
+      "longitude": 79.0830
     }
   ],
   "travel_time_matrix_minutes": {

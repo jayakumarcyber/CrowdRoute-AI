@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { ArrowRight, BarChart3, Users, Zap, ShieldAlert, HelpCircle } from 'lucide-react';
+import { ArrowRight, BarChart3, Users, Zap, ShieldAlert, ChevronDown, ChevronUp } from 'lucide-react';
 import { ForecastResponse, RiskLevel, Stop } from '../types/api';
 import { DemandChart } from './DemandChart';
+import { formatTo12Hour } from '../utils/timeFormat';
 
 interface CrowdForecastProps {
   forecast: ForecastResponse | null;
@@ -15,6 +16,7 @@ export const CrowdForecast: React.FC<CrowdForecastProps> = ({
   onViewDetailedTable,
 }) => {
   const [showChart, setShowChart] = useState(true);
+  const [showDetails, setShowDetails] = useState(false);
 
   if (!forecast) {
     return (
@@ -30,23 +32,23 @@ export const CrowdForecast: React.FC<CrowdForecastProps> = ({
     switch (risk) {
       case 'CRITICAL':
         return {
-          label: 'Very High Crowd Risk',
+          label: 'Very High Crowd',
           classes: 'bg-red-50 text-red-800 border-red-200 font-bold',
         };
       case 'HIGH':
         return {
-          label: 'High Crowd Risk',
+          label: 'High Crowd',
           classes: 'bg-orange-50 text-orange-800 border-orange-200 font-bold',
         };
       case 'MODERATE':
         return {
-          label: 'Moderate Crowd Risk',
+          label: 'Moderate Crowd',
           classes: 'bg-amber-50 text-amber-800 border-amber-200 font-semibold',
         };
       case 'LOW':
       default:
         return {
-          label: 'Low Crowd Risk',
+          label: 'Low Crowd',
           classes: 'bg-emerald-50 text-emerald-800 border-emerald-200 font-semibold',
         };
     }
@@ -67,7 +69,7 @@ export const CrowdForecast: React.FC<CrowdForecastProps> = ({
             Crowd Prediction
           </h2>
           <p className="text-sm text-slate-600 max-w-2xl">
-            Forecast of passenger arrivals, expected congestion, and busiest times across active bus terminals.
+            Anticipated passenger arrivals, busiest times, and available bus carrying capacity across active terminals.
           </p>
         </div>
 
@@ -99,6 +101,7 @@ export const CrowdForecast: React.FC<CrowdForecastProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {stopList.map((stop) => {
           const isCritical = stop.overall_risk === 'CRITICAL';
+          const hasZeroBuses = stop.baseline_scheduled_capacity === 0;
           const badge = getRiskBadge(stop.overall_risk);
           const stopObj = stops.find((s) => s.stop_id === stop.stop_id);
           const stopTitle = stopObj ? stopObj.name : stop.stop_id;
@@ -127,6 +130,19 @@ export const CrowdForecast: React.FC<CrowdForecastProps> = ({
                 </span>
               </div>
 
+              {/* ZERO CAPACITY ALERT CALLOUT FOR STOPS WITH NO ASSIGNED FLEET (e.g. East Temple Gate) */}
+              {hasZeroBuses && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-2.5 text-xs text-red-800 space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-red-900">
+                    <ShieldAlert className="w-4 h-4 text-red-600 flex-shrink-0" />
+                    <span>No buses assigned</span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-red-700">
+                    This stop currently has no assigned bus capacity and requires operational attention. Existing buses must be relocated here.
+                  </p>
+                </div>
+              )}
+
               {/* METRIC ROWS */}
               <div className="space-y-2 text-xs border-t border-slate-100 pt-3">
                 <div className="flex justify-between items-center text-slate-600">
@@ -134,20 +150,28 @@ export const CrowdForecast: React.FC<CrowdForecastProps> = ({
                     <span>Busiest Time:</span>
                   </span>
                   <span className="font-mono font-bold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                    {stop.peak_interval}
+                    {formatTo12Hour(stop.peak_interval)}
                   </span>
                 </div>
+
                 <div className="flex justify-between items-center text-slate-600">
                   <span>Expected Passengers:</span>
                   <span className="font-mono font-bold text-slate-900">
-                    {stop.peak_demand.toLocaleString()} pax/window
+                    {stop.peak_demand.toLocaleString()} passengers
                   </span>
                 </div>
+
                 <div className="flex justify-between items-center text-slate-600">
-                  <span>Bus Carrying Capacity:</span>
-                  <span className="font-mono font-semibold text-emerald-700">
-                    {stop.baseline_scheduled_capacity.toLocaleString()} pax/window
-                  </span>
+                  <span>Bus Capacity:</span>
+                  {hasZeroBuses ? (
+                    <span className="font-mono font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded border border-red-200">
+                      No buses assigned (0 pax)
+                    </span>
+                  ) : (
+                    <span className="font-mono font-semibold text-emerald-700">
+                      {stop.baseline_scheduled_capacity.toLocaleString()} pax/window
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -157,7 +181,12 @@ export const CrowdForecast: React.FC<CrowdForecastProps> = ({
                   <Users className="w-3.5 h-3.5 text-slate-400" />
                   <span>Total Crowd: <strong>{stop.total_demand.toLocaleString()}</strong></span>
                 </div>
-                {isCritical ? (
+                {hasZeroBuses ? (
+                  <span className="inline-flex items-center gap-1 text-red-700 font-semibold">
+                    <ShieldAlert className="w-3.5 h-3.5 text-red-600" />
+                    Needs Attention
+                  </span>
+                ) : isCritical ? (
                   <span className="inline-flex items-center gap-1 text-red-700 font-semibold">
                     <ShieldAlert className="w-3.5 h-3.5 text-red-600" />
                     Bottleneck
@@ -177,16 +206,36 @@ export const CrowdForecast: React.FC<CrowdForecastProps> = ({
       {/* DEMAND CURVE CHART */}
       {showChart && <DemandChart intervals={forecast.intervals} stops={stops} />}
 
-      {/* FOOTNOTE DISCLAIMER */}
-      <div className="bg-slate-100 border-l-4 border-sky-600 rounded-r-md px-4 py-2.5 text-xs text-slate-600">
-        <strong>Prediction Methodology: </strong>
-        {forecast.confidence_indicator}. Bus Carrying Capacity represents standard boarding throughput of{' '}
-        <code className="font-mono bg-slate-200 px-1 py-0.5 rounded text-slate-800">
-          floor(capacity / 2)
-        </code>{' '}
-        passengers per bus for each 15-minute interval cycle.
+      {/* EXPANDABLE "MORE DETAILS" OPERATIONAL EXPLAINER */}
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs text-slate-600 space-y-2">
+        <button
+          onClick={() => setShowDetails(!showDetails)}
+          className="w-full flex items-center justify-between text-slate-800 font-semibold hover:text-sky-700"
+        >
+          <span>More details: Prediction Methodology & Boarding Capacity Assumption</span>
+          {showDetails ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </button>
+
+        {showDetails && (
+          <div className="pt-2 border-t border-slate-200 text-slate-600 space-y-1.5 leading-relaxed animate-fadeIn">
+            <p>
+              • <strong>Confidence Indicator:</strong> {forecast.confidence_indicator}
+            </p>
+            <p>
+              • <strong>Standard Boarding Assumption:</strong> Bus Capacity represents standard boarding throughput of{' '}
+              <code className="font-mono bg-slate-200 px-1 py-0.5 rounded text-slate-800">
+                floor(capacity / 2)
+              </code>{' '}
+              passengers per bus for each 15-minute interval cycle (reflecting turnaround, stop clearance, and boarding safety).
+            </p>
+            <p>
+              • <strong>East Temple Gate Assignment:</strong> If a stop has zero scheduled buses, it is recorded as 0 capacity and flagged for relocation rather than assuming phantom vehicles.
+            </p>
+          </div>
+        )}
       </div>
 
     </section>
   );
 };
+

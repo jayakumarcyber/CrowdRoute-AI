@@ -103,6 +103,15 @@ export const api = {
   },
 
   /**
+   * Fetch sample historical Excel (.xlsx) file
+   */
+  async getSampleHistoricalExcelBlob(): Promise<Blob> {
+    const res = await fetch(`${API_BASE}/historical/sample.xlsx`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to download sample Excel spreadsheet`);
+    return res.blob();
+  },
+
+  /**
    * Dynamic crowd passenger forecast
    */
   async postForecast(request: ForecastRequest): Promise<ForecastResponse> {

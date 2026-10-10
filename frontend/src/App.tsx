@@ -14,14 +14,48 @@ import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { HomePage } from './pages/HomePage';
 import { DashboardPage } from './pages/DashboardPage';
+import { DataSourcesPage } from './pages/DataSourcesPage';
 import { ComplaintSection } from './components/ComplaintSection';
 import { ActivityLogEntry } from './components/LiveFestivalUpdates';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { ReportProblemModal, TrackReportModal } from './components/CivicModals';
 import { AlertCircle } from 'lucide-react';
+import { formatTo12Hour } from './utils/timeFormat';
+
+const getFormattedNow = () =>
+  new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
+
+const getPageFromUrl = (): 'home' | 'dashboard' | 'complaints' | 'sources' => {
+  if (typeof window === 'undefined') return 'home';
+  const pathname = window.location.pathname.toLowerCase();
+  const hash = window.location.hash.toLowerCase();
+  if (pathname.startsWith('/dashboard') || hash.includes('dashboard')) return 'dashboard';
+  if (pathname.startsWith('/complaints') || hash.includes('complaints')) return 'complaints';
+  if (pathname.startsWith('/sources') || hash.includes('sources')) return 'sources';
+  return 'home';
+};
+
+const getTabFromUrl = (): string => {
+  if (typeof window === 'undefined') return 'scenario';
+  const searchParams = new URLSearchParams(window.location.search);
+  const tabParam = searchParams.get('tab');
+  if (tabParam) return tabParam;
+  const hash = window.location.hash.toLowerCase();
+  if (hash.includes('tab=')) {
+    const match = hash.match(/tab=([a-z-]+)/);
+    if (match) return match[1];
+  }
+  return 'scenario';
+};
 
 export const App: React.FC = () => {
-  const [activePage, setActivePage] = useState<'home' | 'dashboard' | 'complaints'>('home');
-  const [dashboardTab, setDashboardTab] = useState<string>('scenario');
+  const [activePage, setActivePage] = useState<'home' | 'dashboard' | 'complaints' | 'sources'>(getPageFromUrl());
+  const [dashboardTab, setDashboardTab] = useState<string>(getTabFromUrl());
   const [systemMode, setSystemMode] = useState<OperationalMode>('DEMO_SYNTHETIC');
+
+  // Civic Modals States (Matching WaterlogAI quick action dialogs)
+  const [isReportModalOpen, setIsReportModalOpen] = useState<boolean>(false);
+  const [isTrackModalOpen, setIsTrackModalOpen] = useState<boolean>(false);
 
   // Request sequencing reference to prevent stale responses from overwriting newer scenarios
   const latestRequestIdRef = useRef<number>(0);
@@ -37,13 +71,13 @@ export const App: React.FC = () => {
 
   // Live constraint monitoring state
   const [isUpdating, setIsUpdating] = useState<boolean>(false);
-  const [lastUpdateTimestamp, setLastUpdateTimestamp] = useState<string>(new Date().toLocaleTimeString());
+  const [lastUpdateTimestamp, setLastUpdateTimestamp] = useState<string>(getFormattedNow());
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([
     {
       id: 'init-0',
-      timestamp: new Date().toLocaleTimeString(),
+      timestamp: getFormattedNow(),
       action: 'System Initialized',
-      details: 'Loaded baseline festival schedule (21:30 finish, Clear weather). Fixed fleet: 16 buses.',
+      details: 'Loaded baseline festival schedule (9:30 PM finish, Clear weather). Fixed fleet: 16 buses.',
       type: 'system',
     },
   ]);
@@ -93,7 +127,7 @@ export const App: React.FC = () => {
         if (currentReqId !== latestRequestIdRef.current) return;
         setSimulation(simRes);
 
-        setLastUpdateTimestamp(new Date().toLocaleTimeString());
+        setLastUpdateTimestamp(getFormattedNow());
       } catch (err: any) {
         if (currentReqId !== latestRequestIdRef.current) return;
         console.error('Analysis execution error:', err);
@@ -163,9 +197,9 @@ export const App: React.FC = () => {
       setSystemMode('DEMO_SYNTHETIC');
       const resetEntry: ActivityLogEntry = {
         id: `${Date.now()}-reset`,
-        timestamp: new Date().toLocaleTimeString(),
+        timestamp: getFormattedNow(),
         action: 'Reset to Scenario Defaults',
-        details: 'Restored baseline 21:30 event conclusion and Clear weather.',
+        details: 'Restored baseline 9:30 PM event conclusion and Clear weather.',
         type: 'reset',
       };
       setActivityLog((prev) => [resetEntry, ...prev.slice(0, 24)]);
@@ -185,9 +219,9 @@ export const App: React.FC = () => {
     setScenario(updatedScenario);
     const newEntry: ActivityLogEntry = {
       id: `${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      timestamp: new Date().toLocaleTimeString(),
+      timestamp: getFormattedNow(),
       action: description,
-      details: `Scenario updated (End time: ${updatedScenario.festival_programme.scheduled_event_end_time}, Weather: ${updatedScenario.weather.condition}). Auto-recalculating pipeline.`,
+      details: `Scenario updated (End time: ${formatTo12Hour(updatedScenario.festival_programme.scheduled_event_end_time)}, Weather: ${updatedScenario.weather.condition}). Auto-recalculating pipeline.`,
       type: description.toLowerCase().includes('weather')
         ? 'weather'
         : description.toLowerCase().includes('delay')
@@ -264,10 +298,52 @@ export const App: React.FC = () => {
     }
   };
 
+  /**
+   * Browser URL synchronized navigation
+   */
+  const navigateTo = useCallback(
+    (page: 'home' | 'dashboard' | 'complaints' | 'sources', tab?: string) => {
+      setActivePage(page);
+      if (tab) setDashboardTab(tab);
+
+      const targetTab = tab || (page === 'dashboard' ? dashboardTab : undefined);
+      let targetPath = '/';
+      if (page === 'dashboard') {
+        targetPath = targetTab && targetTab !== 'scenario' ? `/dashboard?tab=${targetTab}` : '/dashboard';
+      } else if (page === 'complaints') {
+        targetPath = '/complaints';
+      } else if (page === 'sources') {
+        targetPath = '/sources';
+      }
+
+      if (window.location.pathname + window.location.search !== targetPath) {
+        try {
+          window.history.pushState({ page, tab: targetTab }, '', targetPath);
+        } catch (e) {
+          window.location.hash = page;
+        }
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    [dashboardTab]
+  );
+
+  // Synchronize on browser Back/Forward or direct hash/path changes
+  useEffect(() => {
+    const handleUrlChange = () => {
+      setActivePage(getPageFromUrl());
+      setDashboardTab(getTabFromUrl());
+    };
+    window.addEventListener('popstate', handleUrlChange);
+    window.addEventListener('hashchange', handleUrlChange);
+    return () => {
+      window.removeEventListener('popstate', handleUrlChange);
+      window.removeEventListener('hashchange', handleUrlChange);
+    };
+  }, []);
+
   const handleNavigateDashboard = (tab?: string) => {
-    if (tab) setDashboardTab(tab);
-    setActivePage('dashboard');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    navigateTo('dashboard', tab);
   };
 
   return (
@@ -276,11 +352,21 @@ export const App: React.FC = () => {
       {/* 1. HEADER */}
       <Header
         activePage={activePage}
-        setActivePage={setActivePage}
+        setActivePage={navigateTo}
         systemMode={systemMode}
+        onOpenReportModal={() => setIsReportModalOpen(true)}
+        onOpenTrackModal={() => setIsTrackModalOpen(true)}
         onNavigateSection={(sectionId) => {
-          const el = document.getElementById(sectionId);
-          if (el) el.scrollIntoView({ behavior: 'smooth' });
+          if (activePage !== 'home') {
+            navigateTo('home');
+            setTimeout(() => {
+              const el = document.getElementById(sectionId);
+              if (el) el.scrollIntoView({ behavior: 'smooth' });
+            }, 100);
+          } else {
+            const el = document.getElementById(sectionId);
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+          }
         }}
       />
 
@@ -300,57 +386,82 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      {/* 2. MAIN CONTENT VIEW */}
+      {/* 2. MAIN CONTENT VIEW PROTECTED BY ERROR BOUNDARY */}
       <main className="flex-1">
-        {activePage === 'home' ? (
-          <HomePage
-            scenario={scenario}
-            forecast={forecast}
-            allocation={allocation}
-            systemMode={systemMode}
-            onSetMode={handleSetMode}
-            onResetDefaults={handleResetDefaults}
-            onRefresh={handleRefresh}
-            onNavigateDashboard={handleNavigateDashboard}
-            onNavigateComplaints={() => {
-              setActivePage('complaints');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            onLiveScenarioUpdate={handleLiveScenarioUpdate}
-            isUpdating={isUpdating}
-            activityLog={activityLog}
-            lastUpdateTimestamp={lastUpdateTimestamp}
-            isLoading={isLoading}
-          />
-        ) : activePage === 'complaints' ? (
-          <div className="py-6">
-            <ComplaintSection stops={scenario?.stops || []} />
-          </div>
-        ) : (
-          <DashboardPage
-            initialTab={dashboardTab}
-            scenario={scenario}
-            forecast={forecast}
-            allocation={allocation}
-            simulation={simulation}
-            uploadResult={uploadResult}
-            liveStatus={liveStatus}
-            onApplyScenario={handleApplyScenario}
-            onReloadScenario={handleResetDefaults}
-            onUploadFile={handleUploadFile}
-            onLoadSampleCsv={handleLoadSampleCsv}
-            onRefreshLive={handleRefreshLive}
-            onBackToHome={() => {
-              setActivePage('home');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            isLoading={isLoading}
-          />
-        )}
+        <ErrorBoundary fallbackTitle="Portal View Recovery" onReset={handleResetDefaults}>
+          {activePage === 'home' ? (
+            <HomePage
+              scenario={scenario}
+              forecast={forecast}
+              allocation={allocation}
+              systemMode={systemMode}
+              onSetMode={handleSetMode}
+              onResetDefaults={handleResetDefaults}
+              onRefresh={handleRefresh}
+              onNavigateDashboard={handleNavigateDashboard}
+              onNavigateComplaints={() => {
+                navigateTo('complaints');
+              }}
+              onLiveScenarioUpdate={handleLiveScenarioUpdate}
+              isUpdating={isUpdating}
+              activityLog={activityLog}
+              lastUpdateTimestamp={lastUpdateTimestamp}
+              isLoading={isLoading}
+            />
+          ) : activePage === 'complaints' ? (
+            <div className="py-6">
+              <ComplaintSection stops={scenario?.stops || []} />
+            </div>
+          ) : activePage === 'sources' ? (
+            <DataSourcesPage
+              scenario={scenario}
+              liveStatus={liveStatus}
+              uploadResult={uploadResult}
+              onRefreshLive={handleRefreshLive}
+              onBackToHome={() => {
+                navigateTo('home');
+              }}
+              onNavigatePastData={() => {
+                handleNavigateDashboard('historical');
+              }}
+              isLoading={isLoading}
+            />
+          ) : (
+            <DashboardPage
+              initialTab={dashboardTab}
+              scenario={scenario}
+              forecast={forecast}
+              allocation={allocation}
+              simulation={simulation}
+              uploadResult={uploadResult}
+              liveStatus={liveStatus}
+              onApplyScenario={handleApplyScenario}
+              onReloadScenario={handleResetDefaults}
+              onUploadFile={handleUploadFile}
+              onLoadSampleCsv={handleLoadSampleCsv}
+              onRefreshLive={handleRefreshLive}
+              onBackToHome={() => {
+                navigateTo('home');
+              }}
+              isLoading={isLoading}
+            />
+          )}
+        </ErrorBoundary>
       </main>
 
       {/* 3. FOOTER */}
       <Footer />
+
+      {/* 4. CIVIC ACTION MODALS (MATCHING WATERLOGAI SCREENSHOTS 4 & 5) */}
+      <ReportProblemModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        stops={scenario?.stops || []}
+      />
+      <TrackReportModal
+        isOpen={isTrackModalOpen}
+        onClose={() => setIsTrackModalOpen(false)}
+      />
     </div>
   );
 };

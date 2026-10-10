@@ -156,7 +156,7 @@ export const ComplaintSection: React.FC<ComplaintSectionProps> = ({ stops }) => 
           CITIZEN GRIEVANCE PORTAL
         </div>
         <h2 className="font-heading text-3xl font-bold text-slate-900 tracking-tight">
-          Report a Transport Problem
+          Report a Problem
         </h2>
         <p className="text-sm text-slate-600 max-w-2xl">
           Report overcrowding, bus delays, or safety issues directly to transport controllers during the festival. All submissions receive an official reference code.
@@ -296,7 +296,7 @@ export const ComplaintSection: React.FC<ComplaintSectionProps> = ({ stops }) => 
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. 21:40"
+                  placeholder="e.g. 9:40 PM"
                   value={incidentTime}
                   onChange={(e) => setIncidentTime(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-sky-500"

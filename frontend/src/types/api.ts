@@ -15,6 +15,8 @@ export interface Stop {
   min_service_buses: number;
   baseline_scheduled_buses: number;
   supported_routes: string[];
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface Bus {

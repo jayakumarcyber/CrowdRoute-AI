@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import { DemandIntervalEstimate, Stop } from '../types/api';
 import { transformDemandChartData } from '../utils/chartData';
+import { formatTo12Hour } from '../utils/timeFormat';
 import { HelpCircle, Filter, Users, Bus, AlertTriangle } from 'lucide-react';
 
 interface DemandChartProps {
@@ -130,9 +131,10 @@ export const DemandChart: React.FC<DemandChartProps> = ({ intervals, stops = [] 
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
             <XAxis
               dataKey="interval"
-              tick={{ fill: '#475569', fontSize: 11, fontFamily: 'JetBrains Mono' }}
+              tick={{ fill: '#475569', fontSize: 10, fontFamily: 'JetBrains Mono' }}
               axisLine={{ stroke: '#cbd5e1' }}
               tickLine={false}
+              tickFormatter={(val) => formatTo12Hour(val)}
             />
             <YAxis
               domain={[0, chartResult.yAxisMax]}
@@ -142,14 +144,14 @@ export const DemandChart: React.FC<DemandChartProps> = ({ intervals, stops = [] 
               tickFormatter={(val) => `${Number(val).toLocaleString()}`}
             />
             <Tooltip
-              content={({ active, payload, label }) => {
+              content={({ active, payload }) => {
                 if (active && payload && payload.length) {
                   const data = payload[0].payload;
                   const deficit = data.overcrowdingDeficit;
                   return (
-                    <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-lg text-xs space-y-1.5 font-sans min-w-[200px]">
+                    <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-lg text-xs space-y-1.5 font-sans min-w-[210px]">
                       <div className="font-mono font-bold text-slate-900 border-b border-slate-100 pb-1">
-                        Time: {data.timeLabel}
+                        Time: {formatTo12Hour(data.interval || data.timeLabel)}
                       </div>
                       <div className="flex justify-between items-center text-sky-700">
                         <span className="flex items-center gap-1.5">
@@ -169,13 +171,13 @@ export const DemandChart: React.FC<DemandChartProps> = ({ intervals, stops = [] 
                         <div className="flex justify-between items-center text-red-700 pt-1 border-t border-slate-100 font-semibold">
                           <span className="flex items-center gap-1">
                             <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
-                            Overcrowding Shortfall:
+                            People Still Waiting:
                           </span>
                           <span className="font-mono">+{Number(deficit).toLocaleString()} pax</span>
                         </div>
                       ) : (
                         <div className="text-emerald-700 pt-1 border-t border-slate-100 text-[11px]">
-                          ✓ Capacity sufficient for crowd
+                          ✓ Buses sufficient for crowd
                         </div>
                       )}
                     </div>
@@ -191,15 +193,15 @@ export const DemandChart: React.FC<DemandChartProps> = ({ intervals, stops = [] 
                 <div className="flex flex-wrap items-center justify-end gap-5 text-xs text-slate-700 mb-2">
                   <span className="inline-flex items-center gap-1.5">
                     <span className="w-3 h-3 rounded bg-sky-600"></span>
-                    <strong className="text-slate-900">Expected Passengers (Crowd Surge)</strong>
+                    <strong className="text-slate-900">Expected Passengers</strong>
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <span className="w-3 h-1 bg-emerald-600 border-t-2 border-emerald-600"></span>
-                    <strong className="text-slate-900">Bus Carrying Capacity</strong>
+                    <strong className="text-slate-900">Bus Capacity</strong>
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <span className="w-3 h-3 rounded bg-red-400"></span>
-                    <span className="text-slate-600">Overcrowding Shortfall</span>
+                    <span className="text-slate-600">People Still Waiting</span>
                   </span>
                 </div>
               )}
@@ -243,11 +245,11 @@ export const DemandChart: React.FC<DemandChartProps> = ({ intervals, stops = [] 
           </span>
         </div>
         <div className="bg-slate-50 rounded-lg p-2.5">
-          <span className="text-slate-500 block">Network Crowd Imbalance:</span>
+          <span className="text-slate-500 block">People Still Waiting at Peak:</span>
           <span className="font-mono font-bold text-amber-700 text-sm">
             {chartResult.maxExpectedPassengers > chartResult.maxCarryingCapacity
-              ? `Deficit of ${(chartResult.maxExpectedPassengers - chartResult.maxCarryingCapacity).toLocaleString()} pax at peak`
-              : 'Sufficient'}
+              ? `${(chartResult.maxExpectedPassengers - chartResult.maxCarryingCapacity).toLocaleString()} people waiting`
+              : '0 (None waiting)'}
           </span>
         </div>
       </div>

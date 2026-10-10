@@ -77,7 +77,7 @@ export const SimulationComparison: React.FC<SimulationComparisonProps> = ({ simu
         {/* KPI 2 */}
         <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-1">
           <span className="block text-xs font-semibold text-slate-500 uppercase">
-            Reduction in Passengers Waiting
+            Reduction in People Still Waiting
           </span>
           <span className="font-heading text-2xl font-bold text-emerald-700 font-mono">
             -{net_comparison.system_unmet_demand_reduction}
@@ -135,7 +135,7 @@ export const SimulationComparison: React.FC<SimulationComparisonProps> = ({ simu
               <span className="font-bold text-slate-900">{baseline_simulation.total_passengers_boarded.toLocaleString()}</span>
             </div>
             <div className="flex justify-between py-1 border-b border-slate-50">
-              <span className="font-sans text-slate-600">Passengers Still Waiting:</span>
+              <span className="font-sans text-slate-600">People Still Waiting:</span>
               <span className="font-bold text-rose-700">{baseline_simulation.system_unmet_demand.toLocaleString()}</span>
             </div>
             <div className="flex justify-between py-1 border-b border-slate-50">
@@ -166,7 +166,7 @@ export const SimulationComparison: React.FC<SimulationComparisonProps> = ({ simu
               <span className="font-bold text-emerald-700">+{proposed_simulation.total_passengers_boarded.toLocaleString()}</span>
             </div>
             <div className="flex justify-between py-1 border-b border-slate-50">
-              <span className="font-sans text-slate-600">Passengers Still Waiting:</span>
+              <span className="font-sans text-slate-600">People Still Waiting:</span>
               <span className="font-bold text-emerald-700">{proposed_simulation.system_unmet_demand.toLocaleString()}</span>
             </div>
             <div className="flex justify-between py-1 border-b border-slate-50">
