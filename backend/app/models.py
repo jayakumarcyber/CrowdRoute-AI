@@ -2,8 +2,43 @@
 Strictly validates inputs, scenario definitions, forecasts, allocation trade-offs, and simulations.
 """
 
+import re
 from typing import Dict, List, Literal, Optional, Any
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+
+# =====================================================================
+# TIME & CAPACITY CONSTANTS AND HELPERS
+# =====================================================================
+
+TIME_HH_MM_REGEX = r"^(?:[01]\d|2[0-3]):[0-5]\d$"
+
+
+def calculate_interval_capacity(bus_capacity: int) -> int:
+    """Standardized 15-minute boarding capacity assumption: floor(capacity / 2).
+    
+    Assumes standard 30-minute regional roundtrip turnaround dispatch cycle
+    (boarding, regional outbound transit, and return).
+    - 60-seat bus: floor(60 / 2) = 30 passengers per 15-minute interval.
+    - 65-seat bus: floor(65 / 2) = 32 passengers per 15-minute interval.
+    """
+    return bus_capacity // 2
+
+
+def validate_hh_mm_string(v: Optional[str]) -> Optional[str]:
+    """Validates semantic HH:MM 24-hour time string (00:00 to 23:59)."""
+    if v is None:
+        return None
+    v = v.strip()
+    match = re.match(r"^(\d{2}):(\d{2})$", v)
+    if not match:
+        raise ValueError(f"Invalid time format '{v}'. Expected format HH:MM with two-digit hour and minute.")
+    hours, minutes = int(match.group(1)), int(match.group(2))
+    if not (0 <= hours <= 23):
+        raise ValueError(f"Invalid hour '{hours:02d}' in '{v}'. Hours must be between 00 and 23.")
+    if not (0 <= minutes <= 59):
+        raise ValueError(f"Invalid minute '{minutes:02d}' in '{v}'. Minutes must be between 00 and 59.")
+    return f"{hours:02d}:{minutes:02d}"
 
 
 # =====================================================================
@@ -43,6 +78,11 @@ class Bus(BaseModel):
         description="List of route codes compatible with this vehicle"
     )
 
+    @property
+    def interval_capacity(self) -> int:
+        """Returns standard 15-minute boarding capacity: floor(capacity / 2)."""
+        return calculate_interval_capacity(self.capacity)
+
     @field_validator("bus_id")
     @classmethod
     def validate_bus_id(cls, v: str) -> str:
@@ -52,14 +92,31 @@ class Bus(BaseModel):
 
 
 class TimeHorizon(BaseModel):
-    start_time: str = Field(..., pattern=r"^\d{2}:\d{2}$", description="Start time HH:MM")
-    end_time: str = Field(..., pattern=r"^\d{2}:\d{2}$", description="End time HH:MM")
+    start_time: str = Field(..., pattern=TIME_HH_MM_REGEX, description="Start time HH:MM (00:00 to 23:59)")
+    end_time: str = Field(..., pattern=TIME_HH_MM_REGEX, description="End time HH:MM (00:00 to 23:59)")
     interval_minutes: int = Field(default=15, gt=0, le=60, description="Time step duration in minutes")
+
+    @field_validator("start_time", "end_time")
+    @classmethod
+    def validate_horizon_times(cls, v: str) -> str:
+        return validate_hh_mm_string(v)
+
+    @model_validator(mode="after")
+    def validate_horizon_range(self) -> "TimeHorizon":
+        s_parts = self.start_time.split(":")
+        e_parts = self.end_time.split(":")
+        s_m = int(s_parts[0]) * 60 + int(s_parts[1])
+        e_m = int(e_parts[0]) * 60 + int(e_parts[1])
+        if s_m >= e_m:
+            raise ValueError(
+                f"Invalid time-horizon range: start_time ({self.start_time}) must be strictly earlier than end_time ({self.end_time})"
+            )
+        return self
 
 
 class FestivalProgramme(BaseModel):
     event_name: str = Field(..., min_length=1)
-    scheduled_event_end_time: str = Field(..., pattern=r"^\d{2}:\d{2}$", description="Event conclusion HH:MM")
+    scheduled_event_end_time: str = Field(..., pattern=TIME_HH_MM_REGEX, description="Event conclusion HH:MM (00:00 to 23:59)")
     time_horizon: TimeHorizon
     expected_total_attendance: int = Field(..., ge=0, description="Total expected crowd attendance")
     exiting_passenger_fraction: float = Field(..., ge=0.0, le=1.0, description="Fraction exiting via transit")
@@ -67,6 +124,11 @@ class FestivalProgramme(BaseModel):
         ...,
         description="Share of departing passengers destined for each stop_id"
     )
+
+    @field_validator("scheduled_event_end_time")
+    @classmethod
+    def validate_event_end(cls, v: str) -> str:
+        return validate_hh_mm_string(v)
 
     @field_validator("demand_distribution")
     @classmethod
@@ -115,6 +177,89 @@ class ScenarioData(BaseModel):
 
 
 # =====================================================================
+# DATA SOURCE, MODES & HISTORICAL DATA MODELS
+# =====================================================================
+
+DataSourceType = Literal["USER_MANUAL", "HISTORICAL_RECORDS", "LIVE_API", "SYNTHETIC_DEMO"]
+OperationalMode = Literal["DEMO_SYNTHETIC", "USER_DATA"]
+
+
+class HistoricalRecord(BaseModel):
+    time: str = Field(..., pattern=TIME_HH_MM_REGEX, description="Time HH:MM (00:00 to 23:59)")
+    stop_id: str = Field(..., min_length=1)
+    passengers: int = Field(..., ge=0)
+
+    @field_validator("time")
+    @classmethod
+    def validate_record_time(cls, v: str) -> str:
+        return validate_hh_mm_string(v)
+
+    @field_validator("stop_id")
+    @classmethod
+    def validate_stop_id_nonempty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("stop_id cannot be empty")
+        return v.strip()
+
+
+class HistoricalUploadResponse(BaseModel):
+    filename: str
+    status: Literal["SUCCESS", "PARTIAL_SUCCESS", "INVALID_FILE"]
+    total_rows: int
+    valid_rows: int
+    invalid_rows_count: int
+    detected_columns: List[str]
+    column_mapping: Dict[str, str]
+    stop_ids_found: List[str]
+    total_passenger_count: int
+    records: List[HistoricalRecord]
+    validation_errors: List[str]
+    data_provenance: str
+
+
+class ActualVsPredictedInterval(BaseModel):
+    interval: str
+    stop_id: str
+    actual: int
+    predicted: int
+    diff: int
+    abs_diff: int
+    percentage_error: float
+
+
+class ActualVsPredictedSummary(BaseModel):
+    overall_mae: float
+    overall_mape: float
+    intervals_compared: int
+    interval_details: List[ActualVsPredictedInterval]
+
+
+class LiveDataSourceStatus(BaseModel):
+    source_name: str
+    status: Literal["ONLINE", "OFFLINE", "UNAVAILABLE", "STALE"]
+    is_available: bool
+    last_updated: Optional[str] = None
+    message: str
+    data: Optional[Dict[str, Any]] = None
+
+
+class LiveDataSummaryResponse(BaseModel):
+    timestamp: str
+    weather_feed: LiveDataSourceStatus
+    bus_schedule_feed: LiveDataSourceStatus
+    overall_status: str
+
+
+class UserDataValidationResult(BaseModel):
+    is_valid: bool
+    mode: OperationalMode
+    missing_fields: List[str]
+    validation_errors: List[str]
+    warnings: List[str]
+    input_sources: Dict[str, DataSourceType]
+
+
+# =====================================================================
 # DEMAND FORECAST MODELS
 # =====================================================================
 
@@ -145,11 +290,19 @@ class ForecastRequest(BaseModel):
     scenario: Optional[ScenarioData] = None
     scheduled_event_end_time_override: Optional[str] = Field(
         default=None,
-        pattern=r"^\d{2}:\d{2}$",
-        description="Optional override for final event ending time"
+        pattern=TIME_HH_MM_REGEX,
+        description="Optional override for final event ending time (HH:MM)"
     )
     weather_condition_override: Optional[Literal["clear", "light_rain", "heavy_rain"]] = None
     attendance_override: Optional[int] = Field(default=None, ge=0)
+    operational_mode: OperationalMode = Field(default="DEMO_SYNTHETIC")
+    historical_records: Optional[List[HistoricalRecord]] = Field(default=None)
+    source_attribution: Optional[Dict[str, DataSourceType]] = Field(default=None)
+
+    @field_validator("scheduled_event_end_time_override")
+    @classmethod
+    def validate_override_time(cls, v: Optional[str]) -> Optional[str]:
+        return validate_hh_mm_string(v)
 
 
 class ForecastResponse(BaseModel):
@@ -161,6 +314,12 @@ class ForecastResponse(BaseModel):
     stop_summaries: Dict[str, StopForecastSummary]
     assumptions: List[str]
     data_provenance: str
+    operational_mode: OperationalMode = "DEMO_SYNTHETIC"
+    confidence_level: Literal["HIGH", "MODERATE", "LOW", "PRELIMINARY_BASELINE"] = "PRELIMINARY_BASELINE"
+    confidence_indicator: str = "Preliminary baseline: Synthetic rule-based model"
+    method_used: str = "Deterministic rule-based Gaussian egress curve"
+    data_limitations: List[str] = Field(default_factory=list)
+    actual_vs_predicted: Optional[ActualVsPredictedSummary] = None
 
 
 # =====================================================================
@@ -171,8 +330,8 @@ class BusMove(BaseModel):
     bus_id: str
     source_stop_id: str
     destination_stop_id: str
-    departure_time: str
-    estimated_arrival_time: str
+    departure_time: str = Field(..., pattern=TIME_HH_MM_REGEX)
+    estimated_arrival_time: str = Field(..., pattern=TIME_HH_MM_REGEX)
     target_peak_interval: str
     destination_need_reason: str
     estimated_destination_benefit: int
@@ -183,6 +342,11 @@ class BusMove(BaseModel):
     constraints_passed: List[str]
     assumptions: List[str]
     status: Literal["RECOMMENDED", "REJECTED"] = "RECOMMENDED"
+
+    @field_validator("departure_time", "estimated_arrival_time")
+    @classmethod
+    def validate_move_times(cls, v: str) -> str:
+        return validate_hh_mm_string(v)
 
 
 class RejectedCandidate(BaseModel):

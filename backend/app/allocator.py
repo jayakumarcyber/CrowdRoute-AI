@@ -16,6 +16,7 @@ from backend.app.models import (
     RejectedCandidate,
     ScenarioData,
     Stop,
+    calculate_interval_capacity,
 )
 from backend.app.forecast import generate_demand_forecast, load_default_scenario, parse_time_to_minutes
 from backend.app.tradeoffs import evaluate_candidate_move
@@ -86,17 +87,22 @@ def allocate_fixed_fleet(request: Optional[AllocateRequest] = None) -> AllocateR
     buses_at_stop: Dict[str, List[Bus]] = {s.stop_id: [] for s in scenario.stops}
     for b in scenario.fleet:
         if b.initial_stop_id in current_buses_count:
-            current_buses_count[b.initial_stop_id] += 1
             buses_at_stop[b.initial_stop_id].append(b)
+            if b.status == "available":
+                current_buses_count[b.initial_stop_id] += 1
 
     # Identify stops with peak deficit
     # A stop is a candidate destination if peak demand exceeds its interval baseline capacity
     candidate_destinations: List[Tuple[str, int, str]] = []
     for stop_id, summary in forecast.stop_summaries.items():
         peak_demand = summary.peak_demand
-        sched_buses = current_buses_count.get(stop_id, 0)
-        # 30 passengers per bus per 15-minute interval cycle
-        interval_cap = sched_buses * 30
+        active_buses = [b for b in buses_at_stop.get(stop_id, []) if b.status == "available"]
+        if active_buses:
+            interval_cap = sum(calculate_interval_capacity(b.capacity) for b in active_buses)
+        elif stop_map.get(stop_id) and stop_map[stop_id].baseline_scheduled_buses > 0:
+            interval_cap = stop_map[stop_id].baseline_scheduled_buses * calculate_interval_capacity(60)
+        else:
+            interval_cap = 0
         deficit = peak_demand - interval_cap
         if deficit > 0 and summary.overall_risk in ["CRITICAL", "HIGH", "MODERATE"]:
             candidate_destinations.append((stop_id, deficit, summary.peak_interval))
@@ -120,7 +126,7 @@ def allocate_fixed_fleet(request: Optional[AllocateRequest] = None) -> AllocateR
         dest_ids_set = {d[0] for d in candidate_destinations}
         potential_sources = [
             s_id for s_id in stop_map.keys()
-            if s_id not in dest_ids_set and current_buses_count.get(s_id, 0) > 0
+            if s_id not in dest_ids_set and len(buses_at_stop.get(s_id, [])) > 0
         ]
         # Sort potential source stops by available surplus descending
         potential_sources.sort(

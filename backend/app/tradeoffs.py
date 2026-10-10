@@ -11,6 +11,7 @@ from backend.app.models import (
     RejectedCandidate,
     ScenarioData,
     Stop,
+    calculate_interval_capacity,
 )
 from backend.app.forecast import parse_time_to_minutes, format_minutes_to_time
 
@@ -171,9 +172,10 @@ def evaluate_candidate_move(
     # HARD CONSTRAINT 6: Net benefit positive
     # (Requirement 5.8: Recommend only when net benefit is positive)
     # -------------------------------------------------------------
-    dest_benefit = bus.capacity
+    bus_interval_cap = calculate_interval_capacity(bus.capacity)
+    dest_benefit = bus_interval_cap
     # Check if source stop would be pushed into an unserved deficit
-    remaining_source_capacity = source_buses_after * bus.capacity
+    remaining_source_capacity = source_buses_after * bus_interval_cap
     unserved_source_passengers = max(0, source_demand_est - remaining_source_capacity)
 
     # Net benefit is relieved destination deficit minus any new unserved passengers at source
@@ -196,13 +198,13 @@ def evaluate_candidate_move(
     # -------------------------------------------------------------
     # All Constraints Passed! Build structured BusMove
     # -------------------------------------------------------------
-    source_service_before_cap = current_source_buses_count * bus.capacity
-    source_service_after_cap = source_buses_after * bus.capacity
+    source_service_before_cap = current_source_buses_count * bus_interval_cap
+    source_service_after_cap = source_buses_after * bus_interval_cap
 
     source_impact_desc = (
-        f"Source stop '{source_stop.name}' ({source_stop_id}) loses 1 bus (Bus {bus.bus_id}, capacity {bus.capacity}). "
+        f"Source stop '{source_stop.name}' ({source_stop_id}) loses 1 bus (Bus {bus.bus_id}, capacity {bus.capacity}, 15-min capacity {bus_interval_cap}). "
         f"Scheduled fleet decreases from {current_source_buses_count} to {source_buses_after} buses "
-        f"(capacity {source_service_before_cap} -> {source_service_after_cap}). "
+        f"(15-min capacity {source_service_before_cap} -> {source_service_after_cap}). "
         f"Minimum safety requirement of {source_stop.min_service_buses} bus(es) is satisfied."
     )
 
@@ -223,7 +225,7 @@ def evaluate_candidate_move(
 
     assumptions = [
         f"Travel time: {effective_travel_time} mins (includes weather multiplier {scenario.weather.travel_time_multiplier:.2f}).",
-        f"Bus boards at maximum passenger rating of {bus.capacity}.",
+        f"Standardized 15-minute boarding capacity assumption: floor({bus.capacity} / 2) = {bus_interval_cap} passengers per interval.",
         f"Source passenger demand for period estimated at {source_demand_est} passengers.",
     ]
 

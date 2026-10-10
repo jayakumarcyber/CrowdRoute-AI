@@ -22,10 +22,15 @@ from backend.app.models import (
     AllocateRequest,
     Bus,
     BusMove,
+    FestivalProgramme,
     ForecastRequest,
     ScenarioData,
+    ScenarioMetadata,
     SimulateRequest,
     Stop,
+    TimeHorizon,
+    WeatherScenario,
+    calculate_interval_capacity,
 )
 from backend.app.forecast import (
     generate_demand_forecast,
@@ -344,3 +349,253 @@ def test_12_simulation_identical_initial_fleet_and_demand(default_scenario):
 
     # Same number of interval snapshots evaluated
     assert len(base_sim.interval_snapshots) == len(prop_sim.interval_snapshots)
+
+
+# =====================================================================
+# REGRESSION TEST: Custom Scenarios in Forecasting and Simulation
+# =====================================================================
+
+def test_custom_scenarios_in_forecasting_and_simulation():
+    """Verifies that forecasting and simulation use the supplied scenario rather than the default."""
+    custom_scenario = ScenarioData(
+        scenario_metadata=ScenarioMetadata(
+            scenario_id="SCN-CUSTOM-REGRESSION-01",
+            title="Custom Regression Test Scenario",
+        ),
+        festival_programme=FestivalProgramme(
+            event_name="Custom Festival Test",
+            scheduled_event_end_time="19:00",
+            time_horizon=TimeHorizon(
+                start_time="18:30",
+                end_time="20:30",
+                interval_minutes=15,
+            ),
+            expected_total_attendance=10000,
+            exiting_passenger_fraction=0.8,
+            demand_distribution={
+                "STOP_CUSTOM_A": 0.85,
+                "STOP_CUSTOM_B": 0.15,
+            },
+        ),
+        weather=WeatherScenario(condition="clear"),
+        stops=[
+            Stop(
+                stop_id="STOP_CUSTOM_A",
+                name="Custom Terminal A",
+                min_service_buses=1,
+                baseline_scheduled_buses=2,
+                supported_routes=["ROUTE-A"],
+            ),
+            Stop(
+                stop_id="STOP_CUSTOM_B",
+                name="Custom Depot B",
+                min_service_buses=1,
+                baseline_scheduled_buses=3,
+                supported_routes=["ROUTE-B", "ROUTE-A"],
+            ),
+        ],
+        travel_time_matrix_minutes={
+            "STOP_CUSTOM_A": {"STOP_CUSTOM_A": 0, "STOP_CUSTOM_B": 15},
+            "STOP_CUSTOM_B": {"STOP_CUSTOM_A": 15, "STOP_CUSTOM_B": 0},
+        },
+        fleet=[
+            Bus(
+                bus_id="BUS-CUST-01",
+                initial_stop_id="STOP_CUSTOM_A",
+                capacity=60,
+                status="available",
+                compatible_stops=["STOP_CUSTOM_A", "STOP_CUSTOM_B"],
+                compatible_routes=["ROUTE-A", "ROUTE-B"],
+            ),
+            Bus(
+                bus_id="BUS-CUST-02",
+                initial_stop_id="STOP_CUSTOM_A",
+                capacity=65,
+                status="available",
+                compatible_stops=["STOP_CUSTOM_A", "STOP_CUSTOM_B"],
+                compatible_routes=["ROUTE-A", "ROUTE-B"],
+            ),
+            Bus(
+                bus_id="BUS-CUST-03",
+                initial_stop_id="STOP_CUSTOM_B",
+                capacity=60,
+                status="available",
+                compatible_stops=["STOP_CUSTOM_A", "STOP_CUSTOM_B"],
+                compatible_routes=["ROUTE-A", "ROUTE-B"],
+            ),
+            Bus(
+                bus_id="BUS-CUST-04",
+                initial_stop_id="STOP_CUSTOM_B",
+                capacity=60,
+                status="available",
+                compatible_stops=["STOP_CUSTOM_A", "STOP_CUSTOM_B"],
+                compatible_routes=["ROUTE-A", "ROUTE-B"],
+            ),
+            Bus(
+                bus_id="BUS-CUST-05",
+                initial_stop_id="STOP_CUSTOM_B",
+                capacity=60,
+                status="available",
+                compatible_stops=["STOP_CUSTOM_A", "STOP_CUSTOM_B"],
+                compatible_routes=["ROUTE-A", "ROUTE-B"],
+            ),
+        ],
+    )
+
+    # 1. Forecasting with custom scenario
+    fc_res = generate_demand_forecast(ForecastRequest(scenario=custom_scenario))
+    assert fc_res.scenario_id == "SCN-CUSTOM-REGRESSION-01"
+    assert set(fc_res.stop_summaries.keys()) == {"STOP_CUSTOM_A", "STOP_CUSTOM_B"}
+    assert "STOP_MAIN" not in fc_res.stop_summaries
+    # Total exiting passengers = 10000 * 0.8 = 8000
+    total_custom_forecast = sum(s.total_demand for s in fc_res.stop_summaries.values())
+    assert 7800 <= total_custom_forecast <= 8200
+
+    # 2. Discrete simulation directly with custom scenario
+    sim_direct = run_discrete_simulation(custom_scenario, moves=[], run_label="BASELINE_SCHEDULE")
+    assert set(sim_direct.stop_metrics.keys()) == {"STOP_CUSTOM_A", "STOP_CUSTOM_B"}
+    assert "STOP_MAIN" not in sim_direct.stop_metrics
+    assert sim_direct.total_passengers_arrived == total_custom_forecast
+
+    # 3. Schedule comparison with custom scenario
+    cmp_res = compare_schedules(SimulateRequest(scenario=custom_scenario))
+    assert cmp_res.scenario_id == "SCN-CUSTOM-REGRESSION-01"
+    assert cmp_res.initial_fleet_count == 5
+    assert set(cmp_res.baseline_simulation.stop_metrics.keys()) == {"STOP_CUSTOM_A", "STOP_CUSTOM_B"}
+    assert set(cmp_res.proposed_simulation.stop_metrics.keys()) == {"STOP_CUSTOM_A", "STOP_CUSTOM_B"}
+    assert cmp_res.fleet_audit.initial_fleet_count == 5
+    assert cmp_res.fleet_audit.final_fleet_count == 5
+    assert cmp_res.fleet_audit.inventory_conserved is True
+
+
+# =====================================================================
+# REGRESSION TEST: Capacity Consistency (60-seat and 65-seat buses)
+# =====================================================================
+
+def test_capacity_consistency_including_60_and_65_seat_buses(default_scenario):
+    """Verifies that 15-minute boarding capacity is floor(capacity / 2) across all modules."""
+    # 1. Direct formula tests
+    assert calculate_interval_capacity(60) == 30
+    assert calculate_interval_capacity(65) == 32
+    assert calculate_interval_capacity(70) == 35
+
+    # 2. Bus model interval_capacity property
+    bus_60 = Bus(bus_id="BUS-60", initial_stop_id="STOP_MAIN", capacity=60)
+    bus_65 = Bus(bus_id="BUS-65", initial_stop_id="STOP_MAIN", capacity=65)
+    assert bus_60.interval_capacity == 30
+    assert bus_65.interval_capacity == 32
+
+    # 3. Trade-off candidate evaluation benefit:
+    # 60-seat bus relocation benefit must be 30, not 60!
+    move_60, _ = evaluate_candidate_move(
+        scenario=default_scenario,
+        bus=bus_60,
+        source_stop_id="STOP_PERIPHERAL",
+        destination_stop_id="STOP_MAIN",
+        departure_time_str="21:00",
+        destination_peak_interval="21:30-21:45",
+        destination_deficit=1000,
+        current_source_buses_count=4,
+        source_demand_est=50,
+    )
+    assert move_60 is not None
+    assert move_60.estimated_destination_benefit == 30
+    assert "15-min capacity" in move_60.source_service_impact_description
+
+    # 65-seat bus relocation benefit must be 32, not 65!
+    move_65, _ = evaluate_candidate_move(
+        scenario=default_scenario,
+        bus=bus_65,
+        source_stop_id="STOP_PERIPHERAL",
+        destination_stop_id="STOP_MAIN",
+        departure_time_str="21:00",
+        destination_peak_interval="21:30-21:45",
+        destination_deficit=1000,
+        current_source_buses_count=4,
+        source_demand_est=50,
+    )
+    assert move_65 is not None
+    assert move_65.estimated_destination_benefit == 32
+    assert "15-min capacity" in move_65.source_service_impact_description
+
+    # 4. Forecast baseline capacity reflects individual bus capacities:
+    # STOP_MAIN has 10 x 60-seat buses + 2 x 65-seat buses:
+    # Expected 15-min capacity = (10 * 30) + (2 * 32) = 300 + 64 = 364
+    # STOP_PERIPHERAL has 4 x 60-seat buses:
+    # Expected 15-min capacity = 4 * 30 = 120
+    fc = generate_demand_forecast(ForecastRequest(scenario=default_scenario))
+    main_intervals = [i for i in fc.intervals if i.stop_id == "STOP_MAIN"]
+    periph_intervals = [i for i in fc.intervals if i.stop_id == "STOP_PERIPHERAL"]
+    for interval in main_intervals:
+        assert interval.baseline_capacity == 364
+    for interval in periph_intervals:
+        assert interval.baseline_capacity == 120
+
+    # Total baseline scheduled capacity over 8 intervals:
+    assert fc.stop_summaries["STOP_MAIN"].baseline_scheduled_capacity == 364 * 8
+    assert fc.stop_summaries["STOP_PERIPHERAL"].baseline_scheduled_capacity == 120 * 8
+
+
+# =====================================================================
+# REGRESSION TEST: Semantic Validation Rejects Invalid HH:MM Times
+# =====================================================================
+
+def test_semantic_validation_rejects_invalid_hh_mm_times():
+    """Verifies that invalid times such as 99:99, 21:75, 24:00 and inverted ranges are rejected."""
+    # 1. Invalid minute (> 59)
+    with pytest.raises(ValidationError):
+        TimeHorizon(start_time="21:75", end_time="22:00")
+
+    # 2. Invalid hour (> 23)
+    with pytest.raises(ValidationError):
+        TimeHorizon(start_time="99:99", end_time="22:00")
+
+    # 3. 24:00 is invalid in 24-hour HH:MM notation (00:00 to 23:59)
+    with pytest.raises(ValidationError):
+        TimeHorizon(start_time="24:00", end_time="25:00")
+
+    # 4. Inverted time horizon range (start >= end)
+    with pytest.raises(ValidationError):
+        TimeHorizon(start_time="22:00", end_time="21:00")
+
+    with pytest.raises(ValidationError):
+        TimeHorizon(start_time="21:30", end_time="21:30")
+
+    # 5. Invalid event end time in FestivalProgramme
+    with pytest.raises(ValidationError):
+        FestivalProgramme(
+            event_name="Invalid Time Fest",
+            scheduled_event_end_time="99:99",
+            time_horizon=TimeHorizon(start_time="20:00", end_time="22:00"),
+            expected_total_attendance=1000,
+            exiting_passenger_fraction=0.5,
+            demand_distribution={"STOP_MAIN": 1.0},
+        )
+
+    with pytest.raises(ValidationError):
+        FestivalProgramme(
+            event_name="Invalid Time Fest 2",
+            scheduled_event_end_time="21:75",
+            time_horizon=TimeHorizon(start_time="20:00", end_time="22:00"),
+            expected_total_attendance=1000,
+            exiting_passenger_fraction=0.5,
+            demand_distribution={"STOP_MAIN": 1.0},
+        )
+
+    # 6. Invalid override in ForecastRequest
+    with pytest.raises(ValidationError):
+        ForecastRequest(scheduled_event_end_time_override="99:99")
+
+    with pytest.raises(ValidationError):
+        ForecastRequest(scheduled_event_end_time_override="21:75")
+
+    # 7. Invalid parse_time_to_minutes
+    with pytest.raises(ValueError):
+        parse_time_to_minutes("99:99")
+
+    with pytest.raises(ValueError):
+        parse_time_to_minutes("21:75")
+
+    with pytest.raises(ValueError):
+        parse_time_to_minutes("24:00")
+

@@ -15,6 +15,7 @@ from backend.app.models import (
     ForecastResponse,
     ScenarioData,
     StopForecastSummary,
+    calculate_interval_capacity,
 )
 
 
@@ -29,9 +30,19 @@ def load_default_scenario() -> ScenarioData:
 
 
 def parse_time_to_minutes(time_str: str) -> int:
-    """Converts HH:MM string to total minutes from 00:00."""
+    """Converts HH:MM string to total minutes from 00:00 with semantic validation."""
     parts = time_str.strip().split(":")
-    return int(parts[0]) * 60 + int(parts[1])
+    if len(parts) != 2:
+        raise ValueError(f"Invalid time format '{time_str}'. Expected HH:MM.")
+    try:
+        h, m = int(parts[0]), int(parts[1])
+    except ValueError:
+        raise ValueError(f"Invalid non-integer time components in '{time_str}'.")
+    if not (0 <= h <= 23):
+        raise ValueError(f"Invalid hour '{h}' in '{time_str}'. Hours must be between 00 and 23.")
+    if not (0 <= m <= 59):
+        raise ValueError(f"Invalid minute '{m}' in '{time_str}'. Minutes must be between 00 and 59.")
+    return h * 60 + m
 
 
 def format_minutes_to_time(minutes: int) -> str:
@@ -73,7 +84,7 @@ def calculate_egress_weights(
 
 
 def generate_demand_forecast(request: Optional[ForecastRequest] = None) -> ForecastResponse:
-    """Generates an explainable synthetic demand forecast for each stop and interval."""
+    """Generates an explainable demand forecast responding dynamically to user or historical data."""
     if request is None:
         request = ForecastRequest()
 
@@ -85,6 +96,15 @@ def generate_demand_forecast(request: Optional[ForecastRequest] = None) -> Forec
     event_end_str = request.scheduled_event_end_time_override or programme.scheduled_event_end_time
     weather_cond = request.weather_condition_override or weather.condition
     total_attendance = request.attendance_override if request.attendance_override is not None else programme.expected_total_attendance
+
+    # Validation in USER_DATA mode
+    if request.operational_mode == "USER_DATA":
+        if total_attendance <= 0:
+            raise ValueError("User Data Mode validation error: expected_total_attendance must be strictly positive.")
+        if not scenario.stops:
+            raise ValueError("User Data Mode validation error: at least one stop must be defined in the scenario.")
+        if not programme.demand_distribution:
+            raise ValueError("User Data Mode validation error: stop-wise demand distribution cannot be empty.")
 
     # Compute weather factor
     if weather_cond == "heavy_rain":
@@ -117,18 +137,38 @@ def generate_demand_forecast(request: Optional[ForecastRequest] = None) -> Forec
     # Exiting passengers through transit
     total_transit_egress = int(total_attendance * programme.exiting_passenger_fraction)
 
-    # Precompute baseline stop capacity per interval
-    stop_map = {s.stop_id: s for s in scenario.stops}
-    # Count baseline buses assigned to each stop
-    buses_per_stop: Dict[str, int] = {s.stop_id: 0 for s in scenario.stops}
+    # Calculate baseline 15-minute boarding capacity per stop based on each bus's configured capacity.
+    stop_interval_cap_map: Dict[str, int] = {s.stop_id: 0 for s in scenario.stops}
+    fleet_assigned_stops = set()
     for b in scenario.fleet:
-        if b.initial_stop_id in buses_per_stop:
-            buses_per_stop[b.initial_stop_id] += 1
+        if b.initial_stop_id in stop_interval_cap_map and b.status == "available":
+            stop_interval_cap_map[b.initial_stop_id] += calculate_interval_capacity(b.capacity)
+            fleet_assigned_stops.add(b.initial_stop_id)
 
-    # Assume standard bus cycle: in a 15-min interval, a scheduled bus provides ~30 passenger movements
-    # (i.e. capacity / 2 for a 30-min roundtrip cycle)
-    avg_bus_cap = 60
-    interval_capacity_per_bus = avg_bus_cap // 2
+    for s in scenario.stops:
+        if s.stop_id not in fleet_assigned_stops and s.baseline_scheduled_buses > 0:
+            stop_interval_cap_map[s.stop_id] = s.baseline_scheduled_buses * calculate_interval_capacity(60)
+
+    # Historical Empirical Pattern Extraction (if provided)
+    historical_by_interval_stop: Dict[Tuple[int, str], int] = {}
+    historical_stop_totals: Dict[str, int] = {}
+    use_historical = bool(request.historical_records)
+
+    if use_historical and request.historical_records:
+        for rec in request.historical_records:
+            try:
+                rec_m = parse_time_to_minutes(rec.time)
+                for idx, (s_m, e_m) in enumerate(time_slots):
+                    if s_m <= rec_m < e_m:
+                        historical_by_interval_stop[(idx, rec.stop_id)] = (
+                            historical_by_interval_stop.get((idx, rec.stop_id), 0) + rec.passengers
+                        )
+                        historical_stop_totals[rec.stop_id] = (
+                            historical_stop_totals.get(rec.stop_id, 0) + rec.passengers
+                        )
+                        break
+            except Exception:
+                continue
 
     estimates: List[DemandIntervalEstimate] = []
     stop_total_demand: Dict[str, int] = {s.stop_id: 0 for s in scenario.stops}
@@ -138,12 +178,31 @@ def generate_demand_forecast(request: Optional[ForecastRequest] = None) -> Forec
         start_str = format_minutes_to_time(s_m)
         end_str = format_minutes_to_time(e_m)
         interval_label = f"{start_str}-{end_str}"
-        w = interval_weights[idx]
+        w_default = interval_weights[idx]
 
         for stop in scenario.stops:
             share = programme.demand_distribution.get(stop.stop_id, 0.0)
             stop_share_passengers = total_transit_egress * share
-            central_est = int(round(stop_share_passengers * w))
+
+            stop_hist_tot = historical_stop_totals.get(stop.stop_id, 0)
+            hist_interval_pax = historical_by_interval_stop.get((idx, stop.stop_id), 0)
+
+            if use_historical and stop_hist_tot > 0:
+                empirical_weight = hist_interval_pax / float(stop_hist_tot)
+                central_est = int(round(stop_share_passengers * empirical_weight))
+                prov = (
+                    f"Historical empirical pattern: {share*100:.1f}% stop split, "
+                    f"interval empirical weight={empirical_weight:.4f} ({hist_interval_pax}/{stop_hist_tot} pax). "
+                    f"Attendance scaled to {total_attendance:,}. Weather={weather_cond}."
+                )
+            else:
+                central_est = int(round(stop_share_passengers * w_default))
+                prov = (
+                    f"{'User-configured' if request.operational_mode == 'USER_DATA' else 'Synthetic rule-based'} estimate: "
+                    f"{share*100:.1f}% stop split, weight={w_default:.4f} from egress curve centered at event end {event_end_str}. "
+                    f"Weather={weather_cond} (concentration={concentration_factor:.1f})."
+                )
+
             low_est = int(round(central_est * 0.85))
             high_est = int(round(central_est * 1.20))
 
@@ -151,9 +210,8 @@ def generate_demand_forecast(request: Optional[ForecastRequest] = None) -> Forec
             if central_est > stop_peak_info[stop.stop_id][1]:
                 stop_peak_info[stop.stop_id] = (interval_label, central_est)
 
-            # Baseline scheduled capacity for this interval
-            sched_buses = buses_per_stop.get(stop.stop_id, stop.baseline_scheduled_buses)
-            interval_cap = sched_buses * interval_capacity_per_bus
+            # Baseline scheduled 15-minute capacity for this interval
+            interval_cap = stop_interval_cap_map.get(stop.stop_id, 0)
             deficit = central_est - interval_cap
 
             # Risk classification
@@ -165,12 +223,6 @@ def generate_demand_forecast(request: Optional[ForecastRequest] = None) -> Forec
                 risk = "MODERATE"
             else:
                 risk = "LOW"
-
-            prov = (
-                f"Synthetic rule-based estimate: {share*100:.1f}% stop split, "
-                f"weight={w:.4f} from egress curve centered at event end {event_end_str}. "
-                f"Weather={weather_cond} (concentration={concentration_factor:.1f})."
-            )
 
             estimates.append(
                 DemandIntervalEstimate(
@@ -193,12 +245,12 @@ def generate_demand_forecast(request: Optional[ForecastRequest] = None) -> Forec
     for stop in scenario.stops:
         tot = stop_total_demand[stop.stop_id]
         pk_int, pk_val = stop_peak_info[stop.stop_id]
-        sched_buses = buses_per_stop.get(stop.stop_id, stop.baseline_scheduled_buses)
-        total_baseline_cap = sched_buses * interval_capacity_per_bus * len(time_slots)
+        interval_cap = stop_interval_cap_map.get(stop.stop_id, 0)
+        total_baseline_cap = interval_cap * len(time_slots)
 
-        if pk_val > sched_buses * interval_capacity_per_bus * 2:
+        if pk_val > interval_cap * 2:
             overall_risk = "CRITICAL"
-        elif pk_val > sched_buses * interval_capacity_per_bus:
+        elif pk_val > interval_cap:
             overall_risk = "HIGH"
         elif tot > total_baseline_cap:
             overall_risk = "MODERATE"
@@ -214,20 +266,68 @@ def generate_demand_forecast(request: Optional[ForecastRequest] = None) -> Forec
             overall_risk=overall_risk,
         )
 
+    # Determine confidence indicator and data limitations
+    if use_historical and historical_stop_totals:
+        confidence_level = "HIGH"
+        confidence_indicator = (
+            f"Historical Empirical Fit (High Confidence): Calibrated from {len(request.historical_records or [])} "
+            f"uploaded records across {len(historical_stop_totals)} stop(s)."
+        )
+        method_used = "Empirical historical distribution scaled by user festival attendance and weather conditions."
+        data_limitations = [
+            "Historical records represent past festival arrival distributions; anomalies may occur if local transit options changed.",
+            "Historical timestamps were aggregated into 15-minute planning bins.",
+            "Weather conditions modify egress intensity via surge concentration multipliers.",
+        ]
+        data_provenance = f"Empirical historical distribution model calibrated against {len(request.historical_records or [])} records."
+    else:
+        confidence_level = "PRELIMINARY_BASELINE"
+        confidence_indicator = (
+            "Preliminary Baseline (Synthetic/Assumed): Deterministic rule-based Gaussian egress curve "
+            "(no empirical historical training data provided)."
+        )
+        method_used = "Deterministic rule-based Gaussian egress model over synthetic scenario data."
+        data_limitations = [
+            "No empirical historical passenger records were supplied for this run.",
+            "Forecast assumes a symmetric departure surge centered at the scheduled event conclusion.",
+            "All passenger counts are planning estimates and must not be used for direct safety-critical operations.",
+        ]
+        data_provenance = "Deterministic rule-based Gaussian egress model over synthetic scenario data."
+
+    # Compute Actual vs Predicted (if historical data provided)
+    actual_vs_predicted_summary = None
+    if use_historical and request.historical_records:
+        from backend.app.historical import calculate_actual_vs_predicted
+        actual_vs_predicted_summary = calculate_actual_vs_predicted(request.historical_records, estimates)
+
     assumptions = [
+        f"Mode: {'User Data Mode' if request.operational_mode == 'USER_DATA' else 'Demo / Synthetic Mode'}.",
         f"Synthetic demand distribution: Total attendance assumed {total_attendance:,} people.",
         f"{programme.exiting_passenger_fraction*100:.0f}% of attendees leave via municipal transit network.",
         f"Event end time: {event_end_str}; egress curve standard deviation: {24.0/concentration_factor:.1f} minutes.",
         f"Weather mode: {weather_cond} with surge concentration factor {concentration_factor:.1f}.",
+        "Standardized 15-minute boarding capacity assumption: floor(capacity / 2) passengers per bus per 15-min interval (e.g., 30 for 60-seat, 32 for 65-seat).",
+        f"Confidence indicator: {confidence_indicator}.",
         "Demand estimates are strictly synthetic baselines for planning and comparison only.",
     ]
 
     return ForecastResponse(
         scenario_id=scenario.scenario_metadata.scenario_id,
+        disclaimer=(
+            "USER DATA MODE ESTIMATE ONLY - Not verified physical measurements"
+            if request.operational_mode == "USER_DATA"
+            else "SYNTHETIC DEMO DATA ONLY - Not real passenger measurements"
+        ),
         event_end_time=event_end_str,
         weather_condition=weather_cond,
         intervals=estimates,
         stop_summaries=summaries,
         assumptions=assumptions,
-        data_provenance="Deterministic rule-based Gaussian egress model over synthetic scenario data.",
+        data_provenance=data_provenance,
+        operational_mode=request.operational_mode,
+        confidence_level=confidence_level,
+        confidence_indicator=confidence_indicator,
+        method_used=method_used,
+        data_limitations=data_limitations,
+        actual_vs_predicted=actual_vs_predicted_summary,
     )

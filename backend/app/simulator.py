@@ -6,15 +6,18 @@ Enables side-by-side comparison of baseline schedule vs proposed reallocation.
 
 from typing import Dict, List, Optional, Tuple, Any
 from backend.app.models import (
+    AllocateRequest,
     Bus,
     BusMove,
     FleetAudit,
+    ForecastRequest,
     IntervalSnapshot,
     ScenarioData,
     SimulateRequest,
     SimulateResponse,
     SimulationRunResult,
     StopSimulationSummary,
+    calculate_interval_capacity,
 )
 from backend.app.forecast import (
     generate_demand_forecast,
@@ -39,7 +42,7 @@ def run_discrete_simulation(
     end_m = parse_time_to_minutes(horizon.end_time)
 
     # 1. Fetch synthetic arrival profile from forecast
-    forecast = generate_demand_forecast()
+    forecast = generate_demand_forecast(ForecastRequest(scenario=scenario))
     arrivals_by_interval_stop: Dict[Tuple[int, str], int] = {}
     for item in forecast.intervals:
         arrivals_by_interval_stop[(item.interval_index, item.stop_id)] = item.central_estimate
@@ -115,9 +118,11 @@ def run_discrete_simulation(
                 if info["status"] == "at_stop" and info["current_stop"] == s_id
             ]
 
-            # In a 15-minute step, assume each stationed bus provides capacity = capacity // 2
+            # In a 15-minute step, assume each stationed bus provides capacity = floor(capacity / 2)
             # (reflecting terminal boarding and regional round-trip cycles)
-            interval_boarding_capacity = sum(bus_state[b_id]["capacity"] // 2 for b_id in stationed_buses)
+            interval_boarding_capacity = sum(
+                calculate_interval_capacity(bus_state[b_id]["capacity"]) for b_id in stationed_buses
+            )
 
             boarded = min(available_to_board, interval_boarding_capacity)
             queue_after = available_to_board - boarded
@@ -195,7 +200,7 @@ def run_discrete_simulation(
     sys_peak_q = max(stop_peak_queue.values())
 
     # Total potential fleet theoretical capacity
-    total_fleet_capacity = sum(b.capacity // 2 for b in scenario.fleet) * len(intervals)
+    total_fleet_capacity = sum(calculate_interval_capacity(b.capacity) for b in scenario.fleet) * len(intervals)
     utilization = round(min(1.0, sys_boarded / max(1, total_fleet_capacity)), 3)
 
     return SimulationRunResult(
@@ -224,7 +229,7 @@ def compare_schedules(request: Optional[SimulateRequest] = None) -> SimulateResp
     if request.moves_override is not None:
         moves = request.moves_override
     else:
-        alloc_res = allocate_fixed_fleet()
+        alloc_res = allocate_fixed_fleet(AllocateRequest(scenario=scenario))
         moves = alloc_res.recommended_moves
 
     # Run Baseline (Zero relocations)

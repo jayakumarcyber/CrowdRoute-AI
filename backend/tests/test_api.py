@@ -77,3 +77,13 @@ def test_invalid_input_rejected(client):
     # Invalid time format (not HH:MM)
     resp = client.post("/api/forecast", json={"scheduled_event_end_time_override": "not-a-time"})
     assert resp.status_code == 422
+
+    # Invalid hour / minute combinations (99:99 and 21:75)
+    resp_99 = client.post("/api/forecast", json={"scheduled_event_end_time_override": "99:99"})
+    assert resp_99.status_code == 422
+
+    resp_75 = client.post("/api/forecast", json={"scheduled_event_end_time_override": "21:75"})
+    assert resp_75.status_code == 422
+
+    resp_24 = client.post("/api/forecast", json={"scheduled_event_end_time_override": "24:00"})
+    assert resp_24.status_code == 422
