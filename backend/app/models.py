@@ -126,6 +126,12 @@ class FestivalProgramme(BaseModel):
         ...,
         description="Share of departing passengers destined for each stop_id"
     )
+    event_start_time: Optional[str] = Field(default="18:00", description="Event start time HH:MM")
+    event_date: Optional[str] = Field(default="2026-11-26", description="Event start date YYYY-MM-DD")
+    event_end_date: Optional[str] = Field(default="2026-11-26", description="Event conclusion date YYYY-MM-DD")
+    event_delay_minutes: int = Field(default=0, ge=0, description="Announced or simulated delay in minutes")
+    timezone: str = Field(default="Asia/Kolkata", description="Configured venue timezone")
+    forecast_horizon_hours: int = Field(default=24, ge=1, le=72, description="Forecast window duration in hours")
 
     @field_validator("scheduled_event_end_time")
     @classmethod
@@ -146,6 +152,31 @@ class WeatherScenario(BaseModel):
     surge_concentration_factor: float = Field(default=1.0, gt=0.0, description="Multiplier compressing surge into fewer intervals")
     travel_time_multiplier: float = Field(default=1.0, ge=1.0, description="Congestion/rain slowdown factor on travel time")
     notes: Optional[str] = Field(default="")
+    source: Literal["manual_scenario", "live_open_meteo", "cached_open_meteo"] = Field(default="manual_scenario")
+    temperature_c: Optional[float] = None
+    rainfall_mm: Optional[float] = None
+    precipitation_probability: Optional[int] = None
+    last_updated: Optional[str] = None
+    is_live: bool = Field(default=False)
+
+
+class LiveWeatherResponse(BaseModel):
+    status: Literal["LIVE", "CACHED", "UNAVAILABLE"]
+    source: str = "Open-Meteo Weather API (Tiruvannamalai)"
+    condition: Literal["clear", "cloudy", "light_rain", "rainy", "heavy_rain"]
+    condition_description: str
+    temperature_c: Optional[float] = None
+    relative_humidity_pct: Optional[int] = None
+    precipitation_mm: Optional[float] = None
+    rain_mm: Optional[float] = None
+    wind_speed_kmh: Optional[float] = None
+    observation_time: Optional[str] = None
+    last_updated: str
+    latitude: float = 12.2253
+    longitude: float = 79.0747
+    timezone: str = "Asia/Kolkata"
+    message: str
+    is_live: bool
 
 
 class ScenarioMetadata(BaseModel):

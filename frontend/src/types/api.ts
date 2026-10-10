@@ -41,6 +41,12 @@ export interface FestivalProgramme {
   expected_total_attendance: number;
   exiting_passenger_fraction: number;
   demand_distribution: Record<string, number>; // stop_id -> fraction
+  event_start_time?: string;
+  event_date?: string;
+  event_end_date?: string;
+  event_delay_minutes?: number;
+  timezone?: string;
+  forecast_horizon_hours?: number;
 }
 
 export interface WeatherScenario {
@@ -48,6 +54,31 @@ export interface WeatherScenario {
   surge_concentration_factor: number;
   travel_time_multiplier: number;
   notes?: string;
+  source?: 'manual_scenario' | 'live_open_meteo' | 'cached_open_meteo';
+  temperature_c?: number;
+  rainfall_mm?: number;
+  precipitation_probability?: number;
+  last_updated?: string;
+  is_live?: boolean;
+}
+
+export interface LiveWeatherResponse {
+  status: 'LIVE' | 'CACHED' | 'UNAVAILABLE';
+  source: string;
+  condition: WeatherCondition;
+  condition_description: string;
+  temperature_c?: number;
+  relative_humidity_pct?: number;
+  precipitation_mm?: number;
+  rain_mm?: number;
+  wind_speed_kmh?: number;
+  observation_time?: string;
+  last_updated: string;
+  latitude: number;
+  longitude: number;
+  timezone: string;
+  message: string;
+  is_live: boolean;
 }
 
 export interface ScenarioMetadata {

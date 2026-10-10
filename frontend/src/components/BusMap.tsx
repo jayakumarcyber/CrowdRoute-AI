@@ -173,17 +173,8 @@ export const BusMap: React.FC<BusMapProps> = ({
     };
   };
 
-  if (!stops || stops.length === 0) {
-    return (
-      <div className="bg-white border border-slate-200 rounded-xl p-8 text-center text-slate-500 space-y-2">
-        <MapPin className="w-8 h-8 text-slate-400 mx-auto" />
-        <p className="font-semibold text-slate-700">Loading Transit Map & Bus Stands...</p>
-        <p className="text-xs text-slate-500">Retrieving configured bus stands and fleet positions.</p>
-      </div>
-    );
-  }
-
   useEffect(() => {
+    if (!stops || stops.length === 0) return;
     if (!mapContainerRef.current) return;
 
     if (mapInstanceRef.current) {
@@ -456,6 +447,16 @@ export const BusMap: React.FC<BusMapProps> = ({
       }
     };
   }, [stops, fleet, forecast, allocation, scenario, showRoutes, showRelocations, showRiskStops, showVehicleBays]);
+
+  if (!stops || stops.length === 0) {
+    return (
+      <div className="bg-white border border-slate-200 rounded-xl p-8 text-center text-slate-500 space-y-2">
+        <MapPin className="w-8 h-8 text-slate-400 mx-auto" />
+        <p className="font-semibold text-slate-700">Loading Transit Map & Bus Stands...</p>
+        <p className="text-xs text-slate-500">Retrieving configured bus stands and fleet positions.</p>
+      </div>
+    );
+  }
 
   const selectedStop = stops.find((s) => s.stop_id === selectedStopId) || stops[0];
   const selectedSummary = forecast?.stop_summaries[selectedStopId];

@@ -8,8 +8,30 @@
   html {
     scroll-behavior: smooth;
   }
+
+  /* Accessibility: Disable smooth scrolling and fast-forward transitions when user prefers reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* Offset internal target anchors below the sticky double-bar navigation */
+  section[id],
+  div[id] {
+    scroll-margin-top: 6.5rem;
+  }
+
   body {
-    @apply bg-slate-50 text-slate-900 font-sans antialiased;
+    @apply bg-slate-50 text-slate-900 font-sans antialiased overflow-x-hidden;
   }
 }
 

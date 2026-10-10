@@ -14,7 +14,25 @@ from backend.app.models import (
     ComplaintResponse,
 )
 
-DB_PATH = Path(__file__).resolve().parent.parent / "data" / "complaints.db"
+import os
+import shutil
+
+DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent / "data" / "complaints.db"
+_env_db_path = os.environ.get("COMPLAINTS_DB_PATH")
+
+if _env_db_path:
+    DB_PATH = Path(_env_db_path)
+elif os.environ.get("VERCEL"):
+    # On Vercel Fluid compute / Lambda, /tmp is writable
+    _tmp_db = Path("/tmp/complaints.db")
+    if not _tmp_db.exists() and DEFAULT_DB_PATH.exists():
+        try:
+            shutil.copy2(str(DEFAULT_DB_PATH), str(_tmp_db))
+        except Exception:
+            pass
+    DB_PATH = _tmp_db
+else:
+    DB_PATH = DEFAULT_DB_PATH
 
 
 def get_db_connection() -> sqlite3.Connection:

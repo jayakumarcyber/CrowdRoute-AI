@@ -7,12 +7,13 @@ interface SimulationComparisonProps {
 }
 
 export const SimulationComparison: React.FC<SimulationComparisonProps> = ({ simulation }) => {
+  const [showExplainer, setShowExplainer] = React.useState(false);
+
   if (!simulation) {
     return <div className="p-8 text-center text-slate-500">Loading simulation results...</div>;
   }
 
   const { baseline_simulation, proposed_simulation, net_comparison, fleet_audit } = simulation;
-  const [showExplainer, setShowExplainer] = React.useState(false);
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-6">

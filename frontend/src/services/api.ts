@@ -9,6 +9,7 @@ import {
   HealthResponse,
   HistoricalUploadResponse,
   LiveDataSummaryResponse,
+  LiveWeatherResponse,
   ScenarioData,
   SimulateRequest,
   SimulateResponse,
@@ -41,7 +42,7 @@ export const api = {
    * Health & System Info
    */
   async getHealth(): Promise<HealthResponse> {
-    const res = await fetch('/health');
+    const res = await fetch(`${API_BASE}/health`);
     return handleResponse<HealthResponse>(res);
   },
 
@@ -71,6 +72,15 @@ export const api = {
   async getLiveStatus(): Promise<LiveDataSummaryResponse> {
     const res = await fetch(`${API_BASE}/live/status`);
     return handleResponse<LiveDataSummaryResponse>(res);
+  },
+
+  /**
+   * Fetch live Open-Meteo meteorological observation for Tiruvannamalai
+   */
+  async getLiveWeather(forceRefresh: boolean = false): Promise<LiveWeatherResponse> {
+    const url = forceRefresh ? `${API_BASE}/weather/live?force_refresh=true` : `${API_BASE}/weather/live`;
+    const res = await fetch(url);
+    return handleResponse<LiveWeatherResponse>(res);
   },
 
   /**

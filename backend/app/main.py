@@ -6,43 +6,86 @@ side-by-side schedule simulation, and serves the interactive dashboard.
 
 import json
 import logging
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+# Ensure both repo root and backend directory are in sys.path for local and Vercel services deployment
+_backend_dir = Path(__file__).resolve().parent.parent
+_repo_root = _backend_dir.parent
+for _p in [str(_repo_root), str(_backend_dir)]:
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
-from backend.app.models import (
-    AllocateRequest,
-    AllocateResponse,
-    ComplaintCreate,
-    ComplaintPublicItem,
-    ComplaintResponse,
-    ForecastRequest,
-    ForecastResponse,
-    HistoricalUploadResponse,
-    LiveDataSummaryResponse,
-    ScenarioData,
-    SimulateRequest,
-    SimulateResponse,
-    UserDataValidationResult,
-)
-from backend.app.complaints import (
-    get_complaint,
-    list_public_complaints,
-    save_complaint,
-)
-from backend.app.forecast import generate_demand_forecast, load_default_scenario
-from backend.app.allocator import allocate_fixed_fleet
-from backend.app.simulator import compare_schedules
-from backend.app.historical import (
-    generate_sample_historical_csv,
-    generate_sample_historical_excel,
-    parse_and_validate_historical_file,
-)
-from backend.app.live_data import get_live_data_summary
+try:
+    from backend.app.models import (
+        AllocateRequest,
+        AllocateResponse,
+        ComplaintCreate,
+        ComplaintPublicItem,
+        ComplaintResponse,
+        ForecastRequest,
+        ForecastResponse,
+        HistoricalUploadResponse,
+        LiveDataSummaryResponse,
+        LiveWeatherResponse,
+        ScenarioData,
+        SimulateRequest,
+        SimulateResponse,
+        UserDataValidationResult,
+    )
+    from backend.app.complaints import (
+        get_complaint,
+        list_public_complaints,
+        save_complaint,
+    )
+    from backend.app.forecast import generate_demand_forecast, load_default_scenario
+    from backend.app.allocator import allocate_fixed_fleet
+    from backend.app.simulator import compare_schedules
+    from backend.app.historical import (
+        generate_sample_historical_csv,
+        generate_sample_historical_excel,
+        parse_and_validate_historical_file,
+    )
+    from backend.app.live_data import get_live_data_summary
+    from backend.app.weather import get_live_weather
+except ImportError:
+    from app.models import (
+        AllocateRequest,
+        AllocateResponse,
+        ComplaintCreate,
+        ComplaintPublicItem,
+        ComplaintResponse,
+        ForecastRequest,
+        ForecastResponse,
+        HistoricalUploadResponse,
+        LiveDataSummaryResponse,
+        LiveWeatherResponse,
+        ScenarioData,
+        SimulateRequest,
+        SimulateResponse,
+        UserDataValidationResult,
+    )
+    from app.complaints import (
+        get_complaint,
+        list_public_complaints,
+        save_complaint,
+    )
+    from app.forecast import generate_demand_forecast, load_default_scenario
+    from app.allocator import allocate_fixed_fleet
+    from app.simulator import compare_schedules
+    from app.historical import (
+        generate_sample_historical_csv,
+        generate_sample_historical_excel,
+        parse_and_validate_historical_file,
+    )
+    from app.live_data import get_live_data_summary
+    from app.weather import get_live_weather
 
 # Configure structured logging
 logging.basicConfig(
@@ -74,6 +117,7 @@ app.add_middleware(
 
 
 @app.get("/health", tags=["System"])
+@app.get("/api/health", tags=["System"])
 def health_check() -> Dict[str, Any]:
     """Returns service health status, supported modes, and domain metadata."""
     return {
@@ -86,6 +130,7 @@ def health_check() -> Dict[str, Any]:
         "supported_data_sources": ["MANUAL_INPUT", "HISTORICAL_RECORDS", "LIVE_API", "SYNTHETIC_DEMO"],
         "disclaimer": "SYNTHETIC DEMO & PLANNING ENGINE ONLY. Never invent real-world physical measurements.",
     }
+
 
 
 @app.get("/api/scenario", response_model=ScenarioData, tags=["Scenario"])
@@ -216,6 +261,19 @@ def get_live_status() -> LiveDataSummaryResponse:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Live status check failed: {str(exc)}",
+        )
+
+
+@app.get("/api/weather/live", response_model=LiveWeatherResponse, tags=["Weather"])
+def get_weather_endpoint(force_refresh: bool = False) -> LiveWeatherResponse:
+    """Returns live ground meteorological telemetry from Open-Meteo for Tiruvannamalai venue."""
+    try:
+        return get_live_weather(force_refresh=force_refresh)
+    except Exception as exc:
+        logger.error(f"Error fetching live weather: {exc}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Live weather query failed: {str(exc)}",
         )
 
 
