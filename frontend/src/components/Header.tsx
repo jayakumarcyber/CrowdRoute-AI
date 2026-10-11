@@ -17,10 +17,22 @@ import {
 } from 'lucide-react';
 import { OperationalMode } from '../types/api';
 
+export type NavItem =
+  | 'home'
+  | 'bus-map'
+  | 'prediction'
+  | 'timetable'
+  | 'planning'
+  | 'simulation'
+  | 'historical'
+  | 'sources';
+
 interface HeaderProps {
   activePage: 'home' | 'dashboard' | 'complaints' | 'sources';
   setActivePage: (page: 'home' | 'dashboard' | 'complaints' | 'sources', tab?: string) => void;
   systemMode: OperationalMode;
+  activeNav?: NavItem;
+  onNavigateNav?: (nav: NavItem) => void;
   onNavigateSection?: (sectionId: string) => void;
   onOpenReportModal?: () => void;
   onOpenTrackModal?: () => void;
@@ -30,19 +42,43 @@ export const Header: React.FC<HeaderProps> = ({
   activePage,
   setActivePage,
   systemMode,
+  activeNav = 'home',
+  onNavigateNav,
   onNavigateSection,
   onOpenReportModal,
   onOpenTrackModal,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const handleNavClick = (sectionId?: string) => {
-    setActivePage('home');
+  const handleItemClick = (item: NavItem, sectionId?: string) => {
     setMobileMenuOpen(false);
-    if (sectionId && onNavigateSection) {
-      setTimeout(() => onNavigateSection(sectionId), 60);
+    if (onNavigateNav) {
+      onNavigateNav(item);
+    } else {
+      if (item === 'sources') {
+        setActivePage('sources');
+      } else if (item === 'simulation') {
+        setActivePage('dashboard', 'simulation');
+      } else if (item === 'historical') {
+        setActivePage('dashboard', 'historical');
+      } else {
+        setActivePage('home');
+        if (sectionId && onNavigateSection) {
+          setTimeout(() => onNavigateSection(sectionId), 60);
+        }
+      }
     }
   };
+
+  const getDesktopClass = (item: NavItem) =>
+    activeNav === item
+      ? 'text-sky-400 font-extrabold border-b-2 border-sky-400 py-1 shadow-sm cursor-default'
+      : 'text-slate-300 hover:text-white transition-colors py-1 focus:outline-none focus:ring-1 focus:ring-sky-400';
+
+  const getMobileClass = (item: NavItem) =>
+    activeNav === item
+      ? 'block w-full text-left font-bold text-xs uppercase tracking-wider py-2 px-3 rounded bg-sky-950/70 text-sky-400 border-l-4 border-sky-400'
+      : 'block w-full text-left font-semibold text-xs uppercase tracking-wider py-2 px-3 text-slate-300 hover:text-white hover:bg-slate-800/50 rounded transition-colors';
 
   return (
     <header className="sticky top-0 z-50 shadow-md">
@@ -80,7 +116,7 @@ export const Header: React.FC<HeaderProps> = ({
           
           {/* BRAND IDENTITY */}
           <button
-            onClick={() => handleNavClick()}
+            onClick={() => handleItemClick('home', 'hero')}
             className="flex items-center gap-3 text-left focus:outline-none group"
           >
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-sky-600 to-blue-800 text-white flex items-center justify-center shadow-md shadow-sky-900/30 flex-shrink-0 group-hover:scale-105 transition-transform">
@@ -101,57 +137,53 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </button>
 
-          {/* DESKTOP MAIN NAVIGATION */}
+          {/* DESKTOP MAIN NAVIGATION (ALL 8 ITEMS INDIVIDUALLY VERIFIED) */}
           <nav className="hidden xl:flex items-center gap-5 text-xs font-bold uppercase tracking-wider">
             <button
-              onClick={() => handleNavClick('hero')}
-              className={`transition-colors py-1 ${
-                activePage === 'home' ? 'text-sky-400 font-extrabold border-b-2 border-sky-400' : 'text-slate-300 hover:text-white'
-              }`}
+              onClick={() => handleItemClick('home', 'hero')}
+              className={getDesktopClass('home')}
             >
               Home
             </button>
             <button
-              onClick={() => handleNavClick('bus-map-section')}
-              className="text-slate-300 hover:text-white transition-colors py-1"
+              onClick={() => handleItemClick('bus-map', 'bus-map-section')}
+              className={getDesktopClass('bus-map')}
             >
               Bus Map
             </button>
             <button
-              onClick={() => handleNavClick('crowd-forecast')}
-              className="text-slate-300 hover:text-white transition-colors py-1"
+              onClick={() => handleItemClick('prediction', 'crowd-forecast')}
+              className={getDesktopClass('prediction')}
             >
               Crowd Prediction
             </button>
             <button
-              onClick={() => handleNavClick('bus-timetable-section')}
-              className="text-slate-300 hover:text-white transition-colors py-1"
+              onClick={() => handleItemClick('timetable', 'bus-timetable-section')}
+              className={getDesktopClass('timetable')}
             >
               Timetable
             </button>
             <button
-              onClick={() => handleNavClick('bus-allocation')}
-              className="text-slate-300 hover:text-white transition-colors py-1"
+              onClick={() => handleItemClick('planning', 'bus-allocation')}
+              className={getDesktopClass('planning')}
             >
               Bus Planning
             </button>
             <button
-              onClick={() => setActivePage('dashboard', 'simulation')}
-              className="text-slate-300 hover:text-white transition-colors py-1"
+              onClick={() => handleItemClick('simulation')}
+              className={getDesktopClass('simulation')}
             >
               Simulation
             </button>
             <button
-              onClick={() => setActivePage('dashboard', 'historical')}
-              className="text-slate-300 hover:text-white transition-colors py-1"
+              onClick={() => handleItemClick('historical')}
+              className={getDesktopClass('historical')}
             >
               Historical Data
             </button>
             <button
-              onClick={() => setActivePage('sources')}
-              className={`transition-colors py-1 ${
-                activePage === 'sources' ? 'text-sky-400 font-extrabold border-b-2 border-sky-400' : 'text-slate-300 hover:text-white'
-              }`}
+              onClick={() => handleItemClick('sources')}
+              className={getDesktopClass('sources')}
             >
               Data & Sources
             </button>
@@ -231,67 +263,57 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* MOBILE COLLAPSIBLE MENU */}
       {mobileMenuOpen && (
-        <div className="xl:hidden bg-[#0b1329] text-white border-b border-slate-700 px-4 py-4 space-y-2.5 animate-fadeIn">
+        <div className="xl:hidden bg-[#0b1329] text-white border-b border-slate-700 px-4 py-4 space-y-2 animate-fadeIn">
           <button
-            onClick={() => handleNavClick('hero')}
-            className="block w-full text-left font-bold text-xs uppercase tracking-wider py-1.5 text-sky-400 hover:text-white"
+            onClick={() => handleItemClick('home', 'hero')}
+            className={getMobileClass('home')}
           >
             Home
           </button>
           <button
-            onClick={() => handleNavClick('bus-map-section')}
-            className="block w-full text-left font-bold text-xs uppercase tracking-wider py-1.5 text-slate-300 hover:text-white"
+            onClick={() => handleItemClick('bus-map', 'bus-map-section')}
+            className={getMobileClass('bus-map')}
           >
             Bus Map
           </button>
           <button
-            onClick={() => handleNavClick('crowd-forecast')}
-            className="block w-full text-left font-bold text-xs uppercase tracking-wider py-1.5 text-slate-300 hover:text-white"
+            onClick={() => handleItemClick('prediction', 'crowd-forecast')}
+            className={getMobileClass('prediction')}
           >
             Crowd Prediction
           </button>
           <button
-            onClick={() => handleNavClick('bus-timetable-section')}
-            className="block w-full text-left font-bold text-xs uppercase tracking-wider py-1.5 text-slate-300 hover:text-white"
+            onClick={() => handleItemClick('timetable', 'bus-timetable-section')}
+            className={getMobileClass('timetable')}
           >
             Timetable
           </button>
           <button
-            onClick={() => handleNavClick('bus-allocation')}
-            className="block w-full text-left font-bold text-xs uppercase tracking-wider py-1.5 text-slate-300 hover:text-white"
+            onClick={() => handleItemClick('planning', 'bus-allocation')}
+            className={getMobileClass('planning')}
           >
             Bus Planning
           </button>
           <button
-            onClick={() => {
-              setActivePage('dashboard', 'historical');
-              setMobileMenuOpen(false);
-            }}
-            className="block w-full text-left font-bold text-xs uppercase tracking-wider py-1.5 text-slate-300 hover:text-white"
+            onClick={() => handleItemClick('simulation')}
+            className={getMobileClass('simulation')}
+          >
+            Simulation
+          </button>
+          <button
+            onClick={() => handleItemClick('historical')}
+            className={getMobileClass('historical')}
           >
             Historical Data
           </button>
           <button
-            onClick={() => {
-              setActivePage('sources');
-              setMobileMenuOpen(false);
-            }}
-            className="block w-full text-left font-bold text-xs uppercase tracking-wider py-1.5 text-slate-300 hover:text-white"
+            onClick={() => handleItemClick('sources')}
+            className={getMobileClass('sources')}
           >
-            Data Sources
-          </button>
-          <button
-            onClick={() => {
-              setActivePage('complaints');
-              setMobileMenuOpen(false);
-            }}
-            className="block w-full text-left font-bold text-xs uppercase tracking-wider py-1.5 text-orange-400 hover:text-white"
-          >
-            Report a Problem
+            Data & Sources
           </button>
         </div>
       )}
-
     </header>
   );
 };

@@ -141,6 +141,117 @@ export function formatDuration(minutes: number | null | undefined): string {
   if (remainingMins === 0) return `${hrs} hr${hrs > 1 ? 's' : ''}`;
   return `${hrs} hr${hrs > 1 ? 's' : ''} ${remainingMins} mins`;
 }
+export function formatTo12HourEstimated(timeStr: string | null | undefined): string {
+  const formatted = formatTo12Hour(timeStr);
+  if (!formatted) return '';
+  return `${formatted} (Est.)`;
+}
+
+/**
+ * Formats a date string (YYYY-MM-DD or standard ISO) into readable IST format: e.g. "11 October 2026"
+ */
+export function formatDateIST(dateStr: string | null | undefined): string {
+  if (!dateStr || typeof dateStr !== 'string') return '';
+  try {
+    const parts = dateStr.trim().split('-');
+    if (parts.length === 3) {
+      const year = parseInt(parts[0], 10);
+      const monthIndex = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      const d = new Date(year, monthIndex, day);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleDateString('en-IN', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        });
+      }
+    }
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      });
+    }
+  } catch {
+    // fallback
+  }
+  return dateStr;
+}
+
+/**
+ * Formats delay minutes nicely.
+ */
+export function formatDelayMinutes(delayMins: number | null | undefined): string {
+  if (!delayMins || delayMins <= 0) return 'On Time (0 min delay)';
+  return `+${delayMins} min delay`;
+}
+
+/**
+ * Checks whether full start date-time precedes end date-time, supporting events that cross midnight.
+ * e.g. start: 2026-10-11 18:00, end: 2026-10-12 02:00 -> valid!
+ */
+export function isValidDateTimeRange(
+  startDateStr: string | null | undefined,
+  startTimeStr: string | null | undefined,
+  endDateStr: string | null | undefined,
+  endTimeStr: string | null | undefined
+): boolean {
+  if (!startTimeStr || !endTimeStr) return false;
+  const pStart = parseHHMM(startTimeStr);
+  const pEnd = parseHHMM(endTimeStr);
+  if (!pStart || !pEnd) return false;
+
+  const sDate = startDateStr || '2026-10-11';
+  const eDate = endDateStr || sDate;
+
+  // Build timestamps
+  try {
+    const sParts = sDate.split('-').map(Number);
+    const eParts = eDate.split('-').map(Number);
+    if (sParts.length !== 3 || eParts.length !== 3) return false;
+
+    const startTimestamp = new Date(sParts[0], sParts[1] - 1, sParts[2], pStart.hours, pStart.minutes).getTime();
+    const endTimestamp = new Date(eParts[0], eParts[1] - 1, eParts[2], pEnd.hours, pEnd.minutes).getTime();
+
+    return endTimestamp > startTimestamp;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Calculates duration in minutes from full start date-time to end date-time.
+ */
+export function calculateDurationFromDateTimes(
+  startDateStr: string | null | undefined,
+  startTimeStr: string | null | undefined,
+  endDateStr: string | null | undefined,
+  endTimeStr: string | null | undefined
+): number | null {
+  if (!startTimeStr || !endTimeStr) return null;
+  const pStart = parseHHMM(startTimeStr);
+  const pEnd = parseHHMM(endTimeStr);
+  if (!pStart || !pEnd) return null;
+
+  const sDate = startDateStr || '2026-10-11';
+  const eDate = endDateStr || sDate;
+
+  try {
+    const sParts = sDate.split('-').map(Number);
+    const eParts = eDate.split('-').map(Number);
+    const startTimestamp = new Date(sParts[0], sParts[1] - 1, sParts[2], pStart.hours, pStart.minutes).getTime();
+    const endTimestamp = new Date(eParts[0], eParts[1] - 1, eParts[2], pEnd.hours, pEnd.minutes).getTime();
+
+    if (endTimestamp < startTimestamp) return null;
+    return Math.round((endTimestamp - startTimestamp) / 60000);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Parses user input in either 12-hour format (e.g., "12:19 pm", "9:30 AM", "12:19pm")
  * or 24-hour format (e.g., "12:19", "21:30", "09:30") into a standardized 24-hour "HH:mm" string.
@@ -186,3 +297,4 @@ export function parseAnyTimeToHHMM(input: string | null | undefined): string | n
 
   return null;
 }
+

@@ -7,7 +7,7 @@ import {
   ScenarioData,
   SimulateResponse,
 } from '../types/api';
-import { ScenarioForm } from '../components/ScenarioForm';
+import { FestivalScenarioControlCenter } from '../components/FestivalScenarioControlCenter';
 import { HistoricalUpload } from '../components/HistoricalUpload';
 import { SimulationComparison } from '../components/SimulationComparison';
 import { TradeoffDetails } from '../components/TradeoffDetails';
@@ -15,6 +15,7 @@ import { DataSourceStatus } from '../components/DataSourceStatus';
 import { BusMap } from '../components/BusMap';
 import { BusMovementImpact } from '../components/BusMovementImpact';
 import { BusTimetable } from '../components/BusTimetable';
+import { DemandChart } from '../components/DemandChart';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import {
   Sliders,
@@ -31,8 +32,18 @@ import {
   Clock,
   ShieldCheck,
   CheckCircle2,
+  TrendingUp,
+  Layers,
+  Activity,
+  ArrowRight,
+  Sparkles,
 } from 'lucide-react';
-import { formatIntervalTo12Hour, formatTo12Hour } from '../utils/timeFormat';
+import {
+  formatDateIST,
+  formatIntervalTo12Hour,
+  formatTo12Hour,
+  formatTo12HourEstimated,
+} from '../utils/timeFormat';
 
 interface DashboardPageProps {
   initialTab?: string;
@@ -49,10 +60,13 @@ interface DashboardPageProps {
   onRefreshLive: () => void;
   onBackToHome: () => void;
   isLoading?: boolean;
+  isUpdating?: boolean;
+  lastUpdateTimestamp?: string;
+  hasRunInitialPrediction?: boolean;
 }
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({
-  initialTab = 'scenario',
+  initialTab = 'all',
   scenario,
   forecast,
   allocation,
@@ -65,7 +79,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   onLoadSampleCsv,
   onRefreshLive,
   onBackToHome,
-  isLoading,
+  isLoading = false,
+  isUpdating = false,
+  lastUpdateTimestamp = '',
+  hasRunInitialPrediction = true,
 }) => {
   const [activeTab, setActiveTab] = useState<string>(initialTab);
 
@@ -75,9 +92,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     }
   }, [initialTab]);
 
-  // Derived application metrics from real data (no fake numbers)
-  const stopsCount = scenario?.stops.length || 3;
-  const fleetCount = scenario?.fleet.length || 16;
+  // Derived application metrics from real data (no fabricated static values)
   const totalAttendance = scenario?.festival_programme.expected_total_attendance || 40000;
   const exitingFraction = scenario?.festival_programme.exiting_passenger_fraction || 0.85;
   const expectedPassengers = Math.round(totalAttendance * exitingFraction);
@@ -87,12 +102,22 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     ? formatTo12Hour(mainSummary.peak_interval)
     : scenario
     ? formatTo12Hour(scenario.festival_programme.scheduled_event_end_time)
-    : '9:30–9:45 PM';
+    : '10:00 PM';
 
-  let highestRisk = 'Very High Crowd';
-  let peakLocation = 'Central Terminal (STOP_MAIN)';
+  let highestRisk = 'Moderate Crowd';
+  let peakLocation = 'Active Stands';
+  let highestDemandStopId = 'STOP_MAIN';
+  let highestPeakCount = 0;
+
   if (forecast && forecast.stop_summaries) {
     const summaries = Object.values(forecast.stop_summaries);
+    summaries.forEach((s) => {
+      if (s.peak_demand > highestPeakCount) {
+        highestPeakCount = s.peak_demand;
+        highestDemandStopId = s.stop_id;
+      }
+    });
+
     const critStop = summaries.find((s) => s.overall_risk === 'CRITICAL');
     const highStop = summaries.find((s) => s.overall_risk === 'HIGH');
     if (critStop) {
@@ -101,15 +126,21 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     } else if (highStop) {
       highestRisk = 'High Crowd';
       peakLocation = `${highStop.stop_id} (${formatTo12Hour(highStop.peak_interval)})`;
-    } else {
-      highestRisk = 'Moderate Crowd';
-      peakLocation = 'Active Stands';
     }
   }
 
+  // Calculate fleet stats
+  const totalFleet = scenario?.fleet.length || 16;
+  const availableBuses = scenario?.fleet.filter((b) => b.status === 'available').length || totalFleet;
+  const estimatedRequiredBuses = Math.max(1, Math.ceil(highestPeakCount / 30));
+  const fleetShortfallOrSurplus = availableBuses - estimatedRequiredBuses;
+
+  const highestStopObj = scenario?.stops.find((s) => s.stop_id === highestDemandStopId);
+  const highestStopName = highestStopObj ? highestStopObj.name : highestDemandStopId;
+
   return (
     <ErrorBoundary fallbackTitle="Dashboard Operations View Recovery">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
         
         {/* TOP HEADER */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-slate-200">
@@ -123,217 +154,315 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 <span>Back to Portal Home</span>
               </button>
               <span className="text-slate-300">•</span>
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                TRANSPORT CONTROLLER CONSOLE
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider font-mono">
+                OPERATIONS CONTROL CONSOLE
               </span>
             </div>
-            <h1 className="font-heading text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-              Operations & Analytics Dashboard
+            <h1 className="font-heading text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+              Festival Transit Operations & Prediction Dashboard
             </h1>
             <p className="text-xs sm:text-sm text-slate-600">
-              Real-time parameter configuration, empirical past crowd calibration, and dispatch audit logs for festival operations.
+              Complete scenario configuration, dynamic crowd forecasting, fixed-fleet optimization, and simulated dispatch monitoring.
             </p>
           </div>
-        </div>
 
-        {/* SECTION 2: DASHBOARD OVERVIEW SUMMARY METRICS (5 UNIFORM CARDS) */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-          {/* Card 1: Total Buses */}
-          <div className="bg-white border border-slate-200 rounded-xl p-3.5 flex items-center gap-3 shadow-sm hover:border-teal-500 transition-all">
-            <div className="w-10 h-10 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center flex-shrink-0">
-              <BusIcon className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <span className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider truncate">
-                Total Buses
-              </span>
-              <span className="font-heading text-xl font-bold text-slate-900 leading-tight">
-                {fleetCount} Buses
-              </span>
-              <span className="block text-[11px] text-emerald-700 font-semibold truncate">
-                Fixed & Conserved
-              </span>
-            </div>
-          </div>
-
-          {/* Card 2: Stops Monitored */}
-          <div className="bg-white border border-slate-200 rounded-xl p-3.5 flex items-center gap-3 shadow-sm hover:border-sky-500 transition-all">
-            <div className="w-10 h-10 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center flex-shrink-0">
-              <MapPin className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <span className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider truncate">
-                Stops Monitored
-              </span>
-              <span className="font-heading text-xl font-bold text-slate-900 leading-tight">
-                {stopsCount} Stands
-              </span>
-              <span className="block text-[11px] text-slate-500 truncate">
-                Active Corridor
-              </span>
-            </div>
-          </div>
-
-          {/* Card 3: Expected Passengers */}
-          <div className="bg-white border border-slate-200 rounded-xl p-3.5 flex items-center gap-3 shadow-sm hover:border-indigo-500 transition-all">
-            <div className="w-10 h-10 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center flex-shrink-0">
-              <Users className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <span className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider truncate">
-                Expected Passengers
-              </span>
-              <span className="font-heading text-xl font-bold text-slate-900 leading-tight font-mono">
-                {expectedPassengers.toLocaleString()}
-              </span>
-              <span className="block text-[11px] text-slate-500 truncate">
-                85% Egress Fraction
-              </span>
-            </div>
-          </div>
-
-          {/* Card 4: Highest Crowd Risk */}
-          <div className="bg-white border border-slate-200 rounded-xl p-3.5 flex items-center gap-3 shadow-sm hover:border-red-500 transition-all">
-            <div className="w-10 h-10 rounded-lg bg-red-100 text-red-700 flex items-center justify-center flex-shrink-0">
-              <AlertTriangle className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <span className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider truncate">
-                Highest Crowd Risk
-              </span>
-              <span className="font-heading text-base font-bold text-red-700 leading-tight truncate block">
-                {highestRisk}
-              </span>
-              <span className="block text-[11px] text-slate-500 truncate" title={peakLocation}>
-                {peakLocation}
-              </span>
-            </div>
-          </div>
-
-          {/* Card 5: Next Demand Peak */}
-          <div className="bg-white border border-slate-200 rounded-xl p-3.5 flex items-center gap-3 shadow-sm hover:border-orange-500 transition-all">
-            <div className="w-10 h-10 rounded-lg bg-orange-100 text-orange-700 flex items-center justify-center flex-shrink-0">
-              <Clock className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <span className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider truncate">
-                Next Demand Peak
-              </span>
-              <span className="font-heading text-xl font-bold text-slate-900 leading-tight font-mono">
-                {nextPeakWindow}
-              </span>
-              <span className="block text-[11px] text-orange-700 font-semibold truncate">
-                Post-ceremony surge
-              </span>
-            </div>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold font-mono">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <span>Fleet: {totalFleet} Buses Fixed</span>
+            </span>
           </div>
         </div>
 
-        {/* DASHBOARD TABS NAVIGATION */}
-        <div className="flex flex-wrap gap-2 border-b-2 border-slate-200 pb-2">
-          
+        {/* ---------------- SECTION 1: CURRENT SCENARIO SUMMARY (PHASE 5) ---------------- */}
+        <section id="section-summary" className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-sky-600"></span>
+              <h2 className="font-heading font-bold text-sm uppercase tracking-wider text-slate-800">
+                Section 1: Current Scenario Summary
+              </h2>
+            </div>
+            <div className="flex items-center gap-2">
+              {isUpdating || isLoading ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-800 text-[11px] font-bold animate-pulse">
+                  <Clock className="w-3 h-3 text-sky-600 animate-spin" />
+                  <span>Calculating...</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                  <span>Up to Date</span>
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 font-mono text-center">
+            {/* Event Name */}
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+              <span className="text-[10px] text-slate-500 uppercase block font-sans truncate">Event Name</span>
+              <strong className="text-xs text-slate-900 block truncate" title={scenario?.festival_programme.event_name}>
+                {scenario?.festival_programme.event_name || 'Festival Demo'}
+              </strong>
+            </div>
+
+            {/* Event Date */}
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+              <span className="text-[10px] text-slate-500 uppercase block font-sans truncate">Event Date</span>
+              <strong className="text-xs text-slate-900 block">
+                {formatDateIST(scenario?.festival_programme.event_date || '2026-10-11')}
+              </strong>
+            </div>
+
+            {/* Start & End Times */}
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+              <span className="text-[10px] text-slate-500 uppercase block font-sans truncate">Event Window</span>
+              <strong className="text-xs text-sky-800 block">
+                {formatTo12Hour(scenario?.festival_programme.event_start_time || '18:00')}–{formatTo12Hour(scenario?.festival_programme.scheduled_event_end_time || '22:00')}
+              </strong>
+            </div>
+
+            {/* Expected Attendance */}
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+              <span className="text-[10px] text-slate-500 uppercase block font-sans truncate">Total Attendees</span>
+              <strong className="text-xs text-slate-900 block">
+                {totalAttendance.toLocaleString()}
+              </strong>
+            </div>
+
+            {/* Public Transport Demand */}
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+              <span className="text-[10px] text-slate-500 uppercase block font-sans truncate">Transit Demand</span>
+              <strong className="text-xs text-blue-700 block">
+                ~{expectedPassengers.toLocaleString()} pax
+              </strong>
+            </div>
+
+            {/* Weather Data Status */}
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+              <span className="text-[10px] text-slate-500 uppercase block font-sans truncate">Weather Telemetry</span>
+              <strong className="text-xs text-slate-900 capitalize block truncate">
+                {scenario?.weather.condition.replace('_', ' ')} ({scenario?.weather.source === 'live_open_meteo' ? 'Live' : 'Manual'})
+              </strong>
+            </div>
+
+            {/* Current Forecast Status */}
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+              <span className="text-[10px] text-slate-500 uppercase block font-sans truncate">Forecast Status</span>
+              <strong className={`text-xs block ${isUpdating ? 'text-sky-700' : 'text-emerald-700'}`}>
+                {isUpdating ? 'Updating...' : 'Calculated'}
+              </strong>
+            </div>
+
+            {/* Last Successful Calculation */}
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+              <span className="text-[10px] text-slate-500 uppercase block font-sans truncate">Last Calculation</span>
+              <strong className="text-xs text-slate-700 block truncate" title={lastUpdateTimestamp}>
+                {lastUpdateTimestamp || 'IST'}
+              </strong>
+            </div>
+          </div>
+        </section>
+
+        {/* ---------------- SECTION 2 & 3: FESTIVAL SCENARIO CONTROL CENTER & RUN PREDICTION ---------------- */}
+        <section id="section-control-center">
+          <FestivalScenarioControlCenter
+            scenario={scenario}
+            forecast={forecast}
+            allocation={allocation}
+            onRunPrediction={onApplyScenario}
+            onResetDefaults={onReloadScenario}
+            isUpdating={isUpdating}
+            isLoading={isLoading}
+            hasRunInitialPrediction={hasRunInitialPrediction}
+            lastUpdateTimestamp={lastUpdateTimestamp}
+          />
+        </section>
+
+        {/* NAVIGATION QUICK TABS */}
+        <div className="flex flex-wrap gap-2 border-b-2 border-slate-200 pb-2 pt-2">
           <button
-            onClick={() => setActiveTab('scenario')}
-            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-md text-xs sm:text-sm font-semibold transition-all ${
-              activeTab === 'scenario'
+            onClick={() => setActiveTab('all')}
+            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              activeTab === 'all'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>Complete Dashboard View</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('results')}
+            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              activeTab === 'results'
                 ? 'bg-sky-50 text-sky-700 border border-sky-300 shadow-sm'
                 : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
             }`}
           >
-            <Sliders className="w-4 h-4 text-sky-600" />
-            <span>1. Scenario & Fleet Editor</span>
+            <TrendingUp className="w-3.5 h-3.5 text-blue-600" />
+            <span>Section 4: Prediction Results</span>
           </button>
-
           <button
-            onClick={() => setActiveTab('map')}
-            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-md text-xs sm:text-sm font-semibold transition-all ${
-              activeTab === 'map'
+            onClick={() => setActiveTab('optimization')}
+            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              activeTab === 'optimization'
                 ? 'bg-sky-50 text-sky-700 border border-sky-300 shadow-sm'
                 : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
             }`}
           >
-            <MapPin className="w-4 h-4 text-rose-600" />
-            <span>2. Interactive Bus Map</span>
+            <Activity className="w-3.5 h-3.5 text-amber-600" />
+            <span>Section 5: Bus Optimization</span>
           </button>
-
           <button
-            onClick={() => setActiveTab('timetable')}
-            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-md text-xs sm:text-sm font-semibold transition-all ${
-              activeTab === 'timetable'
+            onClick={() => setActiveTab('map-timetable')}
+            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              activeTab === 'map-timetable'
                 ? 'bg-sky-50 text-sky-700 border border-sky-300 shadow-sm'
                 : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
             }`}
           >
-            <Calendar className="w-4 h-4 text-sky-600" />
-            <span>3. Bus Timetable & Relocations</span>
+            <MapPin className="w-3.5 h-3.5 text-rose-600" />
+            <span>Section 6: Map & Timetable</span>
           </button>
-
-          <button
-            onClick={() => setActiveTab('historical')}
-            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-md text-xs sm:text-sm font-semibold transition-all ${
-              activeTab === 'historical'
-                ? 'bg-sky-50 text-sky-700 border border-sky-300 shadow-sm'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-            }`}
-          >
-            <FileSpreadsheet className="w-4 h-4 text-indigo-600" />
-            <span>4. Past Crowd Data</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('forecast-table')}
-            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-md text-xs sm:text-sm font-semibold transition-all ${
-              activeTab === 'forecast-table'
-                ? 'bg-sky-50 text-sky-700 border border-sky-300 shadow-sm'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-            }`}
-          >
-            <CalendarDays className="w-4 h-4 text-teal-600" />
-            <span>5. Detailed 15-Min Timeline</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('simulation')}
-            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-md text-xs sm:text-sm font-semibold transition-all ${
-              activeTab === 'simulation'
-                ? 'bg-sky-50 text-sky-700 border border-sky-300 shadow-sm'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-            }`}
-          >
-            <LineChart className="w-4 h-4 text-orange-600" />
-            <span>6. Before and After Bus Changes</span>
-          </button>
-
           <button
             onClick={() => setActiveTab('sources')}
-            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-md text-xs sm:text-sm font-semibold transition-all ${
+            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
               activeTab === 'sources'
                 ? 'bg-sky-50 text-sky-700 border border-sky-300 shadow-sm'
                 : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
             }`}
           >
-            <Radio className="w-4 h-4 text-emerald-600" />
-            <span>7. Data Sources & Provenance</span>
+            <Radio className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Section 7: Historical & Sources</span>
           </button>
-
         </div>
 
-        {/* TAB CONTENT PANELS WRAPPED IN ERROR BOUNDARY */}
-        <div className="space-y-6">
-          
-          {/* TAB 1: SCENARIO & FLEET EDITOR */}
-          {activeTab === 'scenario' && (
-            <ScenarioForm
-              scenario={scenario}
-              onApplyScenario={onApplyScenario}
-              onReloadSaved={onReloadScenario}
-              isLoading={isLoading}
-            />
-          )}
+        {/* ---------------- SECTION 4: PREDICTION RESULTS (PHASE 5) ---------------- */}
+        {(activeTab === 'all' || activeTab === 'results') && (
+          <section id="section-results" className="space-y-5">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-2 border-b border-slate-200">
+              <div className="space-y-0.5">
+                <div className="text-xs font-bold text-sky-700 uppercase tracking-wider font-mono">
+                  SECTION 4: PREDICTION RESULTS & CAPACITY
+                </div>
+                <h3 className="font-heading text-xl sm:text-2xl font-bold text-slate-900">
+                  Dynamic Passenger Demand & Peak Window Estimates
+                </h3>
+              </div>
+              <span className="text-xs text-slate-500 font-mono">
+                {forecast?.intervals.length || 0} discrete 15-min intervals calculated
+              </span>
+            </div>
 
-          {/* TAB 2: INTERACTIVE BUS MAP */}
-          {activeTab === 'map' && (
-            <div className="space-y-4">
+            {/* 4 SUMMARY STAT CARDS */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-1">
+                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                  Highest-Demand Stand
+                </span>
+                <span className="font-heading text-base font-bold text-slate-900 truncate block" title={highestStopName}>
+                  {highestStopName}
+                </span>
+                <span className="text-xs font-mono text-red-600 font-bold block">
+                  Peak: {highestPeakCount.toLocaleString()} pax/interval
+                </span>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-1">
+                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                  Peak-Demand Window
+                </span>
+                <span className="font-heading text-base font-bold text-slate-900 font-mono block">
+                  {nextPeakWindow}
+                </span>
+                <span className="text-xs text-slate-500 block">
+                  Post-ceremony egress surge
+                </span>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-1">
+                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                  Est. Buses Required
+                </span>
+                <span className="font-heading text-xl font-bold text-sky-700 font-mono block">
+                  {estimatedRequiredBuses} Buses
+                </span>
+                <span className="text-xs text-slate-500 block">
+                  Available: {availableBuses} Active Buses
+                </span>
+              </div>
+
+              <div className={`bg-white border rounded-xl p-4 shadow-sm space-y-1 ${
+                fleetShortfallOrSurplus < 0 ? 'border-amber-300 bg-amber-50/40' : 'border-slate-200'
+              }`}>
+                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                  Shortage / Surplus
+                </span>
+                <span className={`font-heading text-xl font-bold font-mono block ${
+                  fleetShortfallOrSurplus < 0 ? 'text-amber-700' : 'text-emerald-700'
+                }`}>
+                  {fleetShortfallOrSurplus < 0 ? `${fleetShortfallOrSurplus} Buses` : `+${fleetShortfallOrSurplus} Buses`}
+                </span>
+                <span className="text-xs text-slate-500 block">
+                  {fleetShortfallOrSurplus < 0 ? 'Deficit at Peak Window' : 'Surplus Fleet Available'}
+                </span>
+              </div>
+            </div>
+
+            {/* DEMAND CHART */}
+            {forecast && forecast.intervals && (
+              <DemandChart intervals={forecast.intervals} stops={scenario?.stops || []} />
+            )}
+          </section>
+        )}
+
+        {/* ---------------- SECTION 5: BUS OPTIMIZATION (PHASE 5) ---------------- */}
+        {(activeTab === 'all' || activeTab === 'optimization') && (
+          <section id="section-optimization" className="space-y-5">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+              <div className="space-y-0.5">
+                <div className="text-xs font-bold text-sky-700 uppercase tracking-wider font-mono">
+                  SECTION 5: BUS OPTIMIZATION & RELOCATIONS
+                </div>
+                <h3 className="font-heading text-xl sm:text-2xl font-bold text-slate-900">
+                  Fixed-Fleet Relocation Recommendations & Service Trade-Offs
+                </h3>
+              </div>
+              <span className="px-2.5 py-1 rounded bg-emerald-100 text-emerald-800 text-xs font-bold font-mono">
+                {allocation?.recommended_moves.length || 0} Recommended Transfers
+              </span>
+            </div>
+
+            <BusMovementImpact
+              allocation={allocation}
+              forecast={forecast}
+              scenario={scenario}
+            />
+
+            {simulation && <SimulationComparison simulation={simulation} />}
+
+            <TradeoffDetails rejectedMoves={allocation?.rejected_moves || []} />
+          </section>
+        )}
+
+        {/* ---------------- SECTION 6: INTERACTIVE MAP AND TIMETABLE (PHASE 5) ---------------- */}
+        {(activeTab === 'all' || activeTab === 'map-timetable') && (
+          <section id="section-map-timetable" className="space-y-6">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+              <div className="space-y-0.5">
+                <div className="text-xs font-bold text-sky-700 uppercase tracking-wider font-mono">
+                  SECTION 6: INTERACTIVE MAP AND TIMETABLE
+                </div>
+                <h3 className="font-heading text-xl sm:text-2xl font-bold text-slate-900">
+                  Transit GIS & Synchronized Fleet Timetable
+                </h3>
+              </div>
+            </div>
+
+            {/* Interactive Bus Map */}
+            <div className="space-y-2">
               <BusMap
                 stops={scenario?.stops || []}
                 fleet={scenario?.fleet || []}
@@ -342,21 +471,32 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 scenario={scenario}
               />
             </div>
-          )}
 
-          {/* TAB 3: OPERATIONAL BUS TIMETABLE */}
-          {activeTab === 'timetable' && (
-            <div className="space-y-4">
+            {/* Bus Timetable */}
+            <div className="space-y-2">
               <BusTimetable
                 allocation={allocation}
                 forecast={forecast}
                 scenario={scenario}
               />
             </div>
-          )}
+          </section>
+        )}
 
-          {/* TAB 4: PAST CROWD DATA */}
-          {activeTab === 'historical' && (
+        {/* ---------------- SECTION 7: HISTORICAL DATA AND SOURCES (PHASE 5) ---------------- */}
+        {(activeTab === 'all' || activeTab === 'sources') && (
+          <section id="section-sources" className="space-y-6">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+              <div className="space-y-0.5">
+                <div className="text-xs font-bold text-sky-700 uppercase tracking-wider font-mono">
+                  SECTION 7: HISTORICAL DATA AND SOURCES
+                </div>
+                <h3 className="font-heading text-xl sm:text-2xl font-bold text-slate-900">
+                  Data Provenance, Live Telemetry & Past Festival Calibration
+                </h3>
+              </div>
+            </div>
+
             <HistoricalUpload
               onUploadFile={onUploadFile}
               onLoadSampleCsv={onLoadSampleCsv}
@@ -364,148 +504,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               accuracy={forecast?.actual_vs_predicted}
               isLoading={isLoading}
             />
-          )}
 
-          {/* TAB 5: DETAILED 15-MIN FORECAST TABLE */}
-          {activeTab === 'forecast-table' && (
-            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-3 border-b border-slate-200">
-                <div>
-                  <h3 className="font-heading font-bold text-xl text-slate-900">
-                    15-Minute Crowd Prediction & Bus Carrying Capacity
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Passengers Still Waiting = <code className="bg-slate-100 px-1 py-0.5 rounded">Expected Passengers - Bus Carrying Capacity</code>.
-                  </p>
-                </div>
-                <span className="text-xs font-mono text-slate-500">
-                  {forecast?.intervals.length || 0} intervals analyzed
-                </span>
-              </div>
-
-              {!forecast || !forecast.intervals || forecast.intervals.length === 0 ? (
-                <div className="p-8 text-center text-slate-500 bg-slate-50 rounded-lg border border-dashed border-slate-300 space-y-2">
-                  <Clock className="w-8 h-8 text-slate-400 mx-auto" />
-                  <p className="font-semibold text-slate-700">No Forecast Intervals Available</p>
-                  <p className="text-xs text-slate-500">Forecast calculations are in progress or awaiting scenario parameters.</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto max-h-[500px] custom-scrollbar">
-                  <table className="w-full text-left text-xs bg-white rounded border border-slate-200">
-                    <thead className="bg-slate-100 text-slate-800 font-bold border-b border-slate-200 sticky top-0">
-                      <tr>
-                        <th className="p-2.5">Interval</th>
-                        <th className="p-2.5">Stop ID</th>
-                        <th className="p-2.5">Low Estimate</th>
-                        <th className="p-2.5">Expected Passengers</th>
-                        <th className="p-2.5">High Estimate</th>
-                        <th className="p-2.5">Bus Capacity</th>
-                        <th className="p-2.5">People Still Waiting</th>
-                        <th className="p-2.5">Crowd Risk</th>
-                        <th className="p-2.5">Provenance Notes</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 font-mono">
-                      {forecast.intervals.map((item, idx) => {
-                        const isDeficit = item.deficit_surplus > 0;
-                        const riskLabel =
-                          item.risk_level === 'CRITICAL'
-                            ? 'Very High Crowd'
-                            : item.risk_level === 'HIGH'
-                            ? 'High Crowd'
-                            : item.risk_level === 'MODERATE'
-                            ? 'Moderate Crowd'
-                            : 'Low Crowd';
-                        return (
-                          <tr key={idx} className="hover:bg-slate-50">
-                            <td className="p-2.5 font-bold text-slate-900">
-                              {formatIntervalTo12Hour(item.start_time, item.end_time)}
-                            </td>
-                            <td className="p-2.5">{item.stop_id}</td>
-                            <td className="p-2.5 text-slate-500">{item.low_estimate.toLocaleString()}</td>
-                            <td className="p-2.5 font-bold text-slate-900">{item.central_estimate.toLocaleString()}</td>
-                            <td className="p-2.5 text-slate-500">{item.high_estimate.toLocaleString()}</td>
-                            <td className="p-2.5">
-                              {item.baseline_capacity === 0 ? (
-                                <span className="text-red-700 font-bold bg-red-50 border border-red-200 px-1 py-0.5 rounded text-[11px]">
-                                  No buses assigned
-                                </span>
-                              ) : (
-                                <span className="text-slate-700 font-semibold">
-                                  {item.baseline_capacity.toLocaleString()}
-                                </span>
-                              )}
-                            </td>
-                            <td className="p-2.5">
-                              <span
-                                className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                                  isDeficit
-                                    ? 'bg-red-50 text-red-700 border border-red-200'
-                                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                }`}
-                              >
-                                {isDeficit ? `+${item.deficit_surplus.toLocaleString()}` : '0 (None waiting)'}
-                              </span>
-                            </td>
-                            <td className="p-2.5">
-                              <span
-                                className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                                  item.risk_level === 'CRITICAL'
-                                    ? 'bg-red-100 text-red-800'
-                                    : item.risk_level === 'HIGH'
-                                    ? 'bg-orange-100 text-orange-800'
-                                    : item.risk_level === 'MODERATE'
-                                    ? 'bg-amber-100 text-amber-800'
-                                    : 'bg-emerald-100 text-emerald-800'
-                                }`}
-                              >
-                                {riskLabel}
-                              </span>
-                            </td>
-                            <td className="p-2.5 font-sans text-slate-500 text-[11px] max-w-xs">
-                              {item.provenance_note}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB 6: BEFORE AND AFTER BUS CHANGES & REJECTIONS AUDIT */}
-          {activeTab === 'simulation' && (
-            <div className="space-y-6">
-              <BusMovementImpact
-                allocation={allocation}
-                forecast={forecast}
-                scenario={scenario}
-              />
-              {simulation ? (
-                <SimulationComparison simulation={simulation} />
-              ) : (
-                <div className="p-8 text-center text-slate-500 bg-white border border-slate-200 rounded-xl space-y-2">
-                  <Clock className="w-8 h-8 text-slate-400 mx-auto" />
-                  <p className="font-semibold text-slate-700">Loading Simulation Results...</p>
-                  <p className="text-xs text-slate-500">Calculating discrete boarding queues under identical arrival dynamics.</p>
-                </div>
-              )}
-              <TradeoffDetails rejectedMoves={allocation?.rejected_moves || []} />
-            </div>
-          )}
-
-          {/* TAB 7: DATA SOURCES & PROVENANCE */}
-          {activeTab === 'sources' && (
             <DataSourceStatus
               liveStatus={liveStatus}
               onRefreshLive={onRefreshLive}
               isLoading={isLoading}
             />
-          )}
-
-        </div>
+          </section>
+        )}
 
       </div>
     </ErrorBoundary>

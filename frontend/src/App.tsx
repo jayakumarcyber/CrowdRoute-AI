@@ -10,7 +10,7 @@ import {
   ScenarioData,
   SimulateResponse,
 } from './types/api';
-import { Header } from './components/Header';
+import { Header, NavItem } from './components/Header';
 import { Footer } from './components/Footer';
 import { HomePage } from './pages/HomePage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -25,18 +25,39 @@ import { formatTo12Hour } from './utils/timeFormat';
 const getFormattedNow = () =>
   new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
 
+const getNavFromUrl = (): NavItem => {
+  if (typeof window === 'undefined') return 'home';
+  const pathname = window.location.pathname.toLowerCase();
+  const searchParams = new URLSearchParams(window.location.search);
+  const tab = searchParams.get('tab')?.toLowerCase() || '';
+  const hash = window.location.hash.toLowerCase();
+
+  if (pathname.startsWith('/sources') || tab === 'sources' || hash.includes('sources')) return 'sources';
+  if (pathname.startsWith('/simulation') || tab === 'simulation' || hash.includes('simulation')) return 'simulation';
+  if (pathname.startsWith('/historical') || tab === 'historical' || hash.includes('historical')) return 'historical';
+  if (pathname.startsWith('/bus-map') || pathname.startsWith('/map') || tab === 'map' || tab === 'map-timetable' || hash.includes('bus-map-section')) return 'bus-map';
+  if (pathname.startsWith('/crowd-prediction') || pathname.startsWith('/prediction') || tab === 'scenario' || tab === 'results' || hash.includes('crowd-forecast') || hash.includes('crowd-prediction-section') || hash.includes('scenario-control')) return 'prediction';
+  if (pathname.startsWith('/timetable') || tab === 'timetable' || hash.includes('bus-timetable-section')) return 'timetable';
+  if (pathname.startsWith('/bus-planning') || pathname.startsWith('/planning') || tab === 'optimization' || hash.includes('bus-allocation')) return 'planning';
+  return 'home';
+};
+
 const getPageFromUrl = (): 'home' | 'dashboard' | 'complaints' | 'sources' => {
   if (typeof window === 'undefined') return 'home';
   const pathname = window.location.pathname.toLowerCase();
   const hash = window.location.hash.toLowerCase();
   if (pathname.startsWith('/dashboard') || hash.includes('dashboard')) return 'dashboard';
+  if (pathname.startsWith('/simulation') || pathname.startsWith('/historical')) return 'dashboard';
   if (pathname.startsWith('/complaints') || hash.includes('complaints')) return 'complaints';
   if (pathname.startsWith('/sources') || hash.includes('sources')) return 'sources';
   return 'home';
 };
 
 const getTabFromUrl = (): string => {
-  if (typeof window === 'undefined') return 'scenario';
+  if (typeof window === 'undefined') return 'all';
+  const pathname = window.location.pathname.toLowerCase();
+  if (pathname.startsWith('/simulation')) return 'optimization';
+  if (pathname.startsWith('/historical')) return 'sources';
   const searchParams = new URLSearchParams(window.location.search);
   const tabParam = searchParams.get('tab');
   if (tabParam) return tabParam;
@@ -45,13 +66,15 @@ const getTabFromUrl = (): string => {
     const match = hash.match(/tab=([a-z-]+)/);
     if (match) return match[1];
   }
-  return 'scenario';
+  return 'all';
 };
 
 export const App: React.FC = () => {
+  const [activeNav, setActiveNav] = useState<NavItem>(getNavFromUrl());
   const [activePage, setActivePage] = useState<'home' | 'dashboard' | 'complaints' | 'sources'>(getPageFromUrl());
   const [dashboardTab, setDashboardTab] = useState<string>(getTabFromUrl());
   const [systemMode, setSystemMode] = useState<OperationalMode>('DEMO_SYNTHETIC');
+  const [hasRunInitialPrediction, setHasRunInitialPrediction] = useState<boolean>(true);
 
   // Civic Modals States (Matching WaterlogAI quick action dialogs)
   const [isReportModalOpen, setIsReportModalOpen] = useState<boolean>(false);
@@ -298,76 +321,159 @@ export const App: React.FC = () => {
     }
   };
 
+  const scrollToSection = useCallback((sectionId: string) => {
+    setTimeout(() => {
+      const el = document.getElementById(sectionId);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 80);
+  }, []);
+
   /**
    * Browser URL synchronized navigation
    */
   const navigateTo = useCallback(
-    (page: 'home' | 'dashboard' | 'complaints' | 'sources', tab?: string) => {
+    (page: 'home' | 'dashboard' | 'complaints' | 'sources', tab?: string, nav?: NavItem) => {
       setActivePage(page);
       if (tab) setDashboardTab(tab);
+      if (nav) setActiveNav(nav);
 
       const targetTab = tab || (page === 'dashboard' ? dashboardTab : undefined);
       let targetPath = '/';
       if (page === 'dashboard') {
-        targetPath = targetTab && targetTab !== 'scenario' ? `/dashboard?tab=${targetTab}` : '/dashboard';
+        if (nav === 'simulation') {
+          targetPath = '/simulation';
+        } else if (nav === 'historical') {
+          targetPath = '/historical';
+        } else {
+          targetPath = targetTab && targetTab !== 'all' ? `/dashboard?tab=${targetTab}` : '/dashboard';
+        }
       } else if (page === 'complaints') {
         targetPath = '/complaints';
       } else if (page === 'sources') {
         targetPath = '/sources';
+      } else if (page === 'home') {
+        if (nav === 'bus-map') targetPath = '/bus-map';
+        else if (nav === 'prediction') targetPath = '/crowd-prediction';
+        else if (nav === 'timetable') targetPath = '/timetable';
+        else if (nav === 'planning') targetPath = '/bus-planning';
+        else targetPath = '/';
       }
 
       if (window.location.pathname + window.location.search !== targetPath) {
         try {
-          window.history.pushState({ page, tab: targetTab }, '', targetPath);
+          window.history.pushState({ page, tab: targetTab, nav }, '', targetPath);
         } catch (e) {
-          window.location.hash = page;
+          window.location.hash = targetPath;
         }
       }
-      window.scrollTo({ top: 0, behavior: 'smooth' });
     },
     [dashboardTab]
+  );
+
+  const handleNavigateNav = useCallback(
+    (item: NavItem) => {
+      setActiveNav(item);
+      switch (item) {
+        case 'home':
+          navigateTo('home', undefined, 'home');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          break;
+        case 'bus-map':
+          navigateTo('home', undefined, 'bus-map');
+          scrollToSection('bus-map-section');
+          break;
+        case 'prediction':
+          navigateTo('home', undefined, 'prediction');
+          scrollToSection('crowd-prediction-section');
+          break;
+        case 'timetable':
+          navigateTo('home', undefined, 'timetable');
+          scrollToSection('bus-timetable-section');
+          break;
+        case 'planning':
+          navigateTo('home', undefined, 'planning');
+          scrollToSection('bus-allocation');
+          break;
+        case 'simulation':
+          navigateTo('dashboard', 'optimization', 'simulation');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          break;
+        case 'historical':
+          navigateTo('dashboard', 'sources', 'historical');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          break;
+        case 'sources':
+          navigateTo('sources', undefined, 'sources');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          break;
+      }
+    },
+    [navigateTo, scrollToSection]
   );
 
   // Synchronize on browser Back/Forward or direct hash/path changes
   useEffect(() => {
     const handleUrlChange = () => {
-      setActivePage(getPageFromUrl());
-      setDashboardTab(getTabFromUrl());
+      const page = getPageFromUrl();
+      const tab = getTabFromUrl();
+      const nav = getNavFromUrl();
+      setActivePage(page);
+      setDashboardTab(tab);
+      setActiveNav(nav);
+
+      if (page === 'home') {
+        if (nav === 'bus-map') scrollToSection('bus-map-section');
+        else if (nav === 'prediction') scrollToSection('crowd-prediction-section');
+        else if (nav === 'timetable') scrollToSection('bus-timetable-section');
+        else if (nav === 'planning') scrollToSection('bus-allocation');
+      }
     };
     window.addEventListener('popstate', handleUrlChange);
     window.addEventListener('hashchange', handleUrlChange);
+    // Initial check on load
+    handleUrlChange();
     return () => {
       window.removeEventListener('popstate', handleUrlChange);
       window.removeEventListener('hashchange', handleUrlChange);
     };
-  }, []);
+  }, [scrollToSection]);
 
   const handleNavigateDashboard = (tab?: string) => {
     navigateTo('dashboard', tab);
   };
 
+  /**
+   * Run Prediction Action from Festival Scenario Control Center
+   */
+  const handleRunPrediction = (updatedScenario: ScenarioData) => {
+    setScenario(updatedScenario);
+    setHasRunInitialPrediction(true);
+    const newEntry: ActivityLogEntry = {
+      id: `${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      timestamp: getFormattedNow(),
+      action: 'Prediction Pipeline Executed',
+      details: `Forecast & fleet relocation calculated for "${updatedScenario.festival_programme.event_name}" (${updatedScenario.festival_programme.expected_total_attendance.toLocaleString()} attendees, ${updatedScenario.weather.condition}).`,
+      type: 'system',
+    };
+    setActivityLog((prev) => [newEntry, ...prev.slice(0, 24)]);
+    executeAnalysis(updatedScenario, systemMode, historicalRecords);
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans">
       
-      {/* 1. HEADER */}
+      {/* 1. HEADER (ACTIVE BLUE NAVBAR) */}
       <Header
         activePage={activePage}
         setActivePage={navigateTo}
+        activeNav={activeNav}
+        onNavigateNav={handleNavigateNav}
         systemMode={systemMode}
         onOpenReportModal={() => setIsReportModalOpen(true)}
         onOpenTrackModal={() => setIsTrackModalOpen(true)}
-        onNavigateSection={(sectionId) => {
-          if (activePage !== 'home') {
-            navigateTo('home');
-            setTimeout(() => {
-              const el = document.getElementById(sectionId);
-              if (el) el.scrollIntoView({ behavior: 'smooth' });
-            }, 100);
-          } else {
-            const el = document.getElementById(sectionId);
-            if (el) el.scrollIntoView({ behavior: 'smooth' });
-          }
-        }}
+        onNavigateSection={(sectionId) => scrollToSection(sectionId)}
       />
 
       {/* ERROR BANNER IF ANY */}
@@ -403,10 +509,12 @@ export const App: React.FC = () => {
                 navigateTo('complaints');
               }}
               onLiveScenarioUpdate={handleLiveScenarioUpdate}
+              onRunPrediction={handleRunPrediction}
               isUpdating={isUpdating}
               activityLog={activityLog}
               lastUpdateTimestamp={lastUpdateTimestamp}
               isLoading={isLoading}
+              hasRunInitialPrediction={hasRunInitialPrediction}
             />
           ) : activePage === 'complaints' ? (
             <div className="py-6">
@@ -435,7 +543,7 @@ export const App: React.FC = () => {
               simulation={simulation}
               uploadResult={uploadResult}
               liveStatus={liveStatus}
-              onApplyScenario={handleApplyScenario}
+              onApplyScenario={handleRunPrediction}
               onReloadScenario={handleResetDefaults}
               onUploadFile={handleUploadFile}
               onLoadSampleCsv={handleLoadSampleCsv}
@@ -444,10 +552,14 @@ export const App: React.FC = () => {
                 navigateTo('home');
               }}
               isLoading={isLoading}
+              isUpdating={isUpdating}
+              lastUpdateTimestamp={lastUpdateTimestamp}
+              hasRunInitialPrediction={hasRunInitialPrediction}
             />
           )}
         </ErrorBoundary>
       </main>
+
 
       {/* 3. FOOTER */}
       <Footer />

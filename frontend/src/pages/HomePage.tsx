@@ -3,6 +3,7 @@ import { HeroSection } from '../components/HeroSection';
 import { AdministrativeStepBar } from '../components/AdministrativeStepBar';
 import { LiveFestivalUpdates, ActivityLogEntry } from '../components/LiveFestivalUpdates';
 import { SummaryMetrics } from '../components/SummaryMetrics';
+import { FestivalScenarioControlCenter } from '../components/FestivalScenarioControlCenter';
 import { CrowdForecast } from '../components/CrowdForecast';
 import { BusMap } from '../components/BusMap';
 import { BusMovementImpact } from '../components/BusMovementImpact';
@@ -26,11 +27,14 @@ interface HomePageProps {
   onNavigateDashboard: (tab?: string) => void;
   onNavigateComplaints?: () => void;
   onLiveScenarioUpdate?: (updated: ScenarioData, desc: string) => void;
+  onRunPrediction?: (updated: ScenarioData) => void;
   isUpdating?: boolean;
   activityLog?: ActivityLogEntry[];
   lastUpdateTimestamp?: string;
   isLoading?: boolean;
+  hasRunInitialPrediction?: boolean;
 }
+
 
 export const HomePage: React.FC<HomePageProps> = ({
   scenario,
@@ -43,11 +47,14 @@ export const HomePage: React.FC<HomePageProps> = ({
   onNavigateDashboard,
   onNavigateComplaints,
   onLiveScenarioUpdate,
+  onRunPrediction,
   isUpdating = false,
   activityLog = [],
   lastUpdateTimestamp = '',
   isLoading,
+  hasRunInitialPrediction = true,
 }) => {
+
   const [selectedHierarchyStop, setSelectedHierarchyStop] = useState<string>('STOP_MAIN');
 
   const scrollTo = (id: string) => {
@@ -72,11 +79,12 @@ export const HomePage: React.FC<HomePageProps> = ({
 
       {/* 2. HERO SECTION WITH AERIAL TRANSIT BACKDROP (SCREENSHOT 2 & 3) */}
       <HeroSection
-        onScrollToForecast={() => scrollTo('crowd-forecast')}
+        onScrollToForecast={() => scrollTo('crowd-prediction-section')}
         onScrollToAllocation={() => scrollTo('bus-allocation')}
         onScrollToMap={() => scrollTo('bus-map-section')}
         onReportProblem={onNavigateComplaints}
       />
+
 
       {/* 3. DARK 4-CARD SUMMARY METRICS STRIP + TELEMETRY CARD (SCREENSHOT 2) */}
       <SummaryMetrics
@@ -124,14 +132,34 @@ export const HomePage: React.FC<HomePageProps> = ({
         />
       </section>
 
-      {/* 6. CROWD FORECAST PREVIEW */}
-      <div id="crowd-forecast">
-        <CrowdForecast
+      {/* 6. CROWD FORECAST & FESTIVAL SCENARIO CONTROL CENTER (PHASE 2) */}
+      <section id="crowd-prediction-section" className="max-w-7xl mx-auto px-4 sm:px-6 space-y-6">
+        <FestivalScenarioControlCenter
+          scenario={scenario}
           forecast={forecast}
-          stops={scenario?.stops || []}
-          onViewDetailedTable={() => onNavigateDashboard('forecast-table')}
+          allocation={allocation}
+          onRunPrediction={(sc) => {
+            if (onRunPrediction) {
+              onRunPrediction(sc);
+            } else if (onLiveScenarioUpdate) {
+              onLiveScenarioUpdate(sc, 'Prediction Executed');
+            }
+          }}
+          onResetDefaults={onResetDefaults}
+          isUpdating={isUpdating}
+          isLoading={isLoading}
+          hasRunInitialPrediction={hasRunInitialPrediction}
+          lastUpdateTimestamp={lastUpdateTimestamp}
         />
-      </div>
+
+        <div id="crowd-forecast">
+          <CrowdForecast
+            forecast={forecast}
+            stops={scenario?.stops || []}
+            onViewDetailedTable={() => onNavigateDashboard('forecast-table')}
+          />
+        </div>
+      </section>
 
       {/* 7. OPERATIONAL BUS TIMETABLE */}
       <section id="bus-timetable-section" className="max-w-7xl mx-auto px-4 sm:px-6">
