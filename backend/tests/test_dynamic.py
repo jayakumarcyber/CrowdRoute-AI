@@ -17,8 +17,8 @@ import io
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.app.main import app
-from backend.app.models import (
+from app.main import app
+from app.models import (
     AllocateRequest,
     Bus,
     ForecastRequest,
@@ -28,13 +28,13 @@ from backend.app.models import (
     Stop,
     TimeHorizon,
 )
-from backend.app.forecast import generate_demand_forecast, load_default_scenario
-from backend.app.allocator import allocate_fixed_fleet
-from backend.app.historical import (
+from app.forecast import generate_demand_forecast, load_default_scenario
+from app.allocator import allocate_fixed_fleet
+from app.historical import (
     generate_sample_historical_csv,
     parse_and_validate_historical_file,
 )
-from backend.app.live_data import get_live_data_summary
+from app.live_data import get_live_data_summary
 
 
 @pytest.fixture

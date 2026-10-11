@@ -10,88 +10,47 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-# Ensure both repo root and backend directory are in sys.path for local and Vercel services deployment
-import types
+# Ensure backend directory is in sys.path
 _backend_dir = Path(__file__).resolve().parent.parent
-_repo_root = _backend_dir.parent
-for _p in [str(_repo_root), str(_backend_dir)]:
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
-
-if "backend" not in sys.modules:
-    backend_pkg = types.ModuleType("backend")
-    backend_pkg.__path__ = [str(_backend_dir)]
-    sys.modules["backend"] = backend_pkg
+if str(_backend_dir) not in sys.path:
+    sys.path.insert(0, str(_backend_dir))
 
 from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
-try:
-    from app.models import (
-        AllocateRequest,
-        AllocateResponse,
-        ComplaintCreate,
-        ComplaintPublicItem,
-        ComplaintResponse,
-        ForecastRequest,
-        ForecastResponse,
-        HistoricalUploadResponse,
-        LiveDataSummaryResponse,
-        LiveWeatherResponse,
-        ScenarioData,
-        SimulateRequest,
-        SimulateResponse,
-        UserDataValidationResult,
-    )
-    from app.complaints import (
-        get_complaint,
-        list_public_complaints,
-        save_complaint,
-    )
-    from app.forecast import generate_demand_forecast, load_default_scenario
-    from app.allocator import allocate_fixed_fleet
-    from app.simulator import compare_schedules
-    from app.historical import (
-        generate_sample_historical_csv,
-        generate_sample_historical_excel,
-        parse_and_validate_historical_file,
-    )
-    from app.live_data import get_live_data_summary
-    from app.weather import get_live_weather
-except ImportError:
-    from backend.app.models import (
-        AllocateRequest,
-        AllocateResponse,
-        ComplaintCreate,
-        ComplaintPublicItem,
-        ComplaintResponse,
-        ForecastRequest,
-        ForecastResponse,
-        HistoricalUploadResponse,
-        LiveDataSummaryResponse,
-        LiveWeatherResponse,
-        ScenarioData,
-        SimulateRequest,
-        SimulateResponse,
-        UserDataValidationResult,
-    )
-    from backend.app.complaints import (
-        get_complaint,
-        list_public_complaints,
-        save_complaint,
-    )
-    from backend.app.forecast import generate_demand_forecast, load_default_scenario
-    from backend.app.allocator import allocate_fixed_fleet
-    from backend.app.simulator import compare_schedules
-    from backend.app.historical import (
-        generate_sample_historical_csv,
-        generate_sample_historical_excel,
-        parse_and_validate_historical_file,
-    )
-    from backend.app.live_data import get_live_data_summary
-    from backend.app.weather import get_live_weather
+from app.models import (
+    AllocateRequest,
+    AllocateResponse,
+    ComplaintCreate,
+    ComplaintPublicItem,
+    ComplaintResponse,
+    ForecastRequest,
+    ForecastResponse,
+    HistoricalUploadResponse,
+    LiveDataSummaryResponse,
+    LiveWeatherResponse,
+    ScenarioData,
+    SimulateRequest,
+    SimulateResponse,
+    UserDataValidationResult,
+)
+from app.complaints import (
+    get_complaint,
+    list_public_complaints,
+    save_complaint,
+)
+from app.forecast import generate_demand_forecast, load_default_scenario
+from app.allocator import allocate_fixed_fleet
+from app.simulator import compare_schedules
+from app.historical import (
+    generate_sample_historical_csv,
+    generate_sample_historical_excel,
+    parse_and_validate_historical_file,
+)
+from app.live_data import get_live_data_summary
+from app.weather import get_live_weather
 
 # Configure structured logging
 logging.basicConfig(

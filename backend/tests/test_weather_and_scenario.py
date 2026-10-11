@@ -1,9 +1,9 @@
 """Tests for Live Weather Open-Meteo Integration and Extended Festival Scenario Inputs."""
 
 from fastapi.testclient import TestClient
-from backend.app.main import app
-from backend.app.weather import map_wmo_code, get_live_weather
-from backend.app.models import ScenarioData, FestivalProgramme, TimeHorizon, Stop, Bus, WeatherScenario, ScenarioMetadata
+from app.main import app
+from app.weather import map_wmo_code, get_live_weather
+from app.models import ScenarioData, FestivalProgramme, TimeHorizon, Stop, Bus, WeatherScenario, ScenarioMetadata
 
 client = TestClient(app)
 

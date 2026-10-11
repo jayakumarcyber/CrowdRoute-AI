@@ -9,24 +9,14 @@ import math
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-try:
-    from app.models import (
-        DemandIntervalEstimate,
-        ForecastRequest,
-        ForecastResponse,
-        ScenarioData,
-        StopForecastSummary,
-        calculate_interval_capacity,
-    )
-except ImportError:
-    from backend.app.models import (
-        DemandIntervalEstimate,
-        ForecastRequest,
-        ForecastResponse,
-        ScenarioData,
-        StopForecastSummary,
-        calculate_interval_capacity,
-    )
+from app.models import (
+    DemandIntervalEstimate,
+    ForecastRequest,
+    ForecastResponse,
+    ScenarioData,
+    StopForecastSummary,
+    calculate_interval_capacity,
+)
 
 
 DEFAULT_SCENARIO_PATH = Path(__file__).resolve().parent.parent / "data" / "demo_scenario.json"
@@ -312,10 +302,7 @@ def generate_demand_forecast(request: Optional[ForecastRequest] = None) -> Forec
     # Compute Actual vs Predicted (if historical data provided)
     actual_vs_predicted_summary = None
     if use_historical and request.historical_records:
-        try:
-            from app.historical import calculate_actual_vs_predicted
-        except ImportError:
-            from backend.app.historical import calculate_actual_vs_predicted
+        from app.historical import calculate_actual_vs_predicted
         actual_vs_predicted_summary = calculate_actual_vs_predicted(request.historical_records, estimates)
 
     assumptions = [

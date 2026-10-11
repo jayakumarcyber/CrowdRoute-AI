@@ -4,7 +4,7 @@ Tests /health, /api/scenario, /api/forecast, /api/allocate, and /api/simulate.
 
 import pytest
 from fastapi.testclient import TestClient
-from backend.app.main import app
+from app.main import app
 
 
 @pytest.fixture

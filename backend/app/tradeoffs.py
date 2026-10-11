@@ -5,26 +5,15 @@ decisions rely on opaque or unquantified heuristics.
 """
 
 from typing import Dict, List, Optional, Tuple
-try:
-    from app.models import (
-        Bus,
-        BusMove,
-        RejectedCandidate,
-        ScenarioData,
-        Stop,
-        calculate_interval_capacity,
-    )
-    from app.forecast import parse_time_to_minutes, format_minutes_to_time
-except ImportError:
-    from backend.app.models import (
-        Bus,
-        BusMove,
-        RejectedCandidate,
-        ScenarioData,
-        Stop,
-        calculate_interval_capacity,
-    )
-    from backend.app.forecast import parse_time_to_minutes, format_minutes_to_time
+from app.models import (
+    Bus,
+    BusMove,
+    RejectedCandidate,
+    ScenarioData,
+    Stop,
+    calculate_interval_capacity,
+)
+from app.forecast import parse_time_to_minutes, format_minutes_to_time
 
 
 def evaluate_candidate_move(

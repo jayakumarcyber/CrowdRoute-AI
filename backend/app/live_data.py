@@ -9,10 +9,7 @@ from datetime import datetime
 from typing import Optional
 import httpx
 
-try:
-    from app.models import LiveDataSourceStatus, LiveDataSummaryResponse
-except ImportError:
-    from backend.app.models import LiveDataSourceStatus, LiveDataSummaryResponse
+from app.models import LiveDataSourceStatus, LiveDataSummaryResponse
 
 
 def check_live_weather_feed() -> LiveDataSourceStatus:

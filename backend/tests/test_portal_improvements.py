@@ -4,15 +4,15 @@ and synthetic historical sample validation.
 import io
 import pytest
 from fastapi.testclient import TestClient
-from backend.app.main import app
-from backend.app.forecast import load_default_scenario, generate_demand_forecast
-from backend.app.allocator import allocate_fixed_fleet
-from backend.app.historical import (
+from app.main import app
+from app.forecast import load_default_scenario, generate_demand_forecast
+from app.allocator import allocate_fixed_fleet
+from app.historical import (
     generate_sample_historical_csv,
     generate_sample_historical_excel,
     parse_and_validate_historical_file,
 )
-from backend.app.models import Stop, ForecastRequest, AllocateRequest
+from app.models import Stop, ForecastRequest, AllocateRequest
 
 client = TestClient(app)
 
@@ -154,7 +154,7 @@ def test_weather_and_delay_workflow_preserves_conservation():
 
 def test_invalid_time_rejection_in_models():
     """Verify that impossible times such as 99:99 or 21:75 are strictly rejected."""
-    from backend.app.models import validate_hh_mm_string
+    from app.models import validate_hh_mm_string
     import pytest
 
     with pytest.raises(ValueError):
@@ -183,7 +183,7 @@ def test_timetable_movement_calculations_and_arrival_before_peak():
     assert allocation.status == "SUCCESS"
     assert len(allocation.recommended_moves) > 0
 
-    from backend.app.forecast import parse_time_to_minutes
+    from app.forecast import parse_time_to_minutes
 
     for move in allocation.recommended_moves:
         dep_mins = parse_time_to_minutes(move.departure_time)

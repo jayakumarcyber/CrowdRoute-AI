@@ -18,7 +18,7 @@ import copy
 import pytest
 from pydantic import ValidationError
 
-from backend.app.models import (
+from app.models import (
     AllocateRequest,
     Bus,
     BusMove,
@@ -32,14 +32,14 @@ from backend.app.models import (
     WeatherScenario,
     calculate_interval_capacity,
 )
-from backend.app.forecast import (
+from app.forecast import (
     generate_demand_forecast,
     load_default_scenario,
     parse_time_to_minutes,
 )
-from backend.app.allocator import allocate_fixed_fleet, audit_fleet_conservation
-from backend.app.tradeoffs import evaluate_candidate_move
-from backend.app.simulator import compare_schedules, run_discrete_simulation
+from app.allocator import allocate_fixed_fleet, audit_fleet_conservation
+from app.tradeoffs import evaluate_candidate_move
+from app.simulator import compare_schedules, run_discrete_simulation
 
 
 # =====================================================================

@@ -4,7 +4,7 @@ Verifies complaint submission, SQLite persistence, validation, tracking, and pri
 
 import pytest
 from fastapi.testclient import TestClient
-from backend.app.main import app
+from app.main import app
 
 
 @pytest.fixture

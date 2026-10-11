@@ -5,50 +5,27 @@ Enables side-by-side comparison of baseline schedule vs proposed reallocation.
 """
 
 from typing import Dict, List, Optional, Tuple, Any
-try:
-    from app.models import (
-        AllocateRequest,
-        Bus,
-        BusMove,
-        FleetAudit,
-        ForecastRequest,
-        IntervalSnapshot,
-        ScenarioData,
-        SimulateRequest,
-        SimulateResponse,
-        SimulationRunResult,
-        StopSimulationSummary,
-        calculate_interval_capacity,
-    )
-    from app.forecast import (
-        generate_demand_forecast,
-        load_default_scenario,
-        parse_time_to_minutes,
-        format_minutes_to_time,
-    )
-    from app.allocator import audit_fleet_conservation, allocate_fixed_fleet
-except ImportError:
-    from backend.app.models import (
-        AllocateRequest,
-        Bus,
-        BusMove,
-        FleetAudit,
-        ForecastRequest,
-        IntervalSnapshot,
-        ScenarioData,
-        SimulateRequest,
-        SimulateResponse,
-        SimulationRunResult,
-        StopSimulationSummary,
-        calculate_interval_capacity,
-    )
-    from backend.app.forecast import (
-        generate_demand_forecast,
-        load_default_scenario,
-        parse_time_to_minutes,
-        format_minutes_to_time,
-    )
-    from backend.app.allocator import audit_fleet_conservation, allocate_fixed_fleet
+from app.models import (
+    AllocateRequest,
+    Bus,
+    BusMove,
+    FleetAudit,
+    ForecastRequest,
+    IntervalSnapshot,
+    ScenarioData,
+    SimulateRequest,
+    SimulateResponse,
+    SimulationRunResult,
+    StopSimulationSummary,
+    calculate_interval_capacity,
+)
+from app.forecast import (
+    generate_demand_forecast,
+    load_default_scenario,
+    parse_time_to_minutes,
+    format_minutes_to_time,
+)
+from app.allocator import audit_fleet_conservation, allocate_fixed_fleet
 
 
 def run_discrete_simulation(

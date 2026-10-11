@@ -8,14 +8,14 @@ Constraint 2: Fixed fleet with visible dual-sided service trade-offs (conservati
 import copy
 import pytest
 
-from backend.app.models import (
+from app.models import (
     AllocateRequest,
     ForecastRequest,
     ScenarioData,
 )
-from backend.app.forecast import generate_demand_forecast, load_default_scenario, parse_time_to_minutes
-from backend.app.allocator import allocate_fixed_fleet
-from backend.app.simulator import run_discrete_simulation, compare_schedules
+from app.forecast import generate_demand_forecast, load_default_scenario, parse_time_to_minutes
+from app.allocator import allocate_fixed_fleet
+from app.simulator import run_discrete_simulation, compare_schedules
 
 
 @pytest.fixture
