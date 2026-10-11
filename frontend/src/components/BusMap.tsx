@@ -749,7 +749,7 @@ export const BusMap: React.FC<BusMapProps> = ({
                   <Users className="w-3 h-3 text-sky-400" />
                   PEAK DEMAND
                 </span>
-                <strong className="font-heading text-sm font-bold text-white block font-mono">
+                <strong className="text-sm font-bold text-white block font-mono">
                   {selectedSummary ? selectedSummary.peak_demand.toLocaleString() : '8,130'} pax
                 </strong>
                 <span className="text-[10px] text-slate-400 block font-mono">
@@ -763,7 +763,7 @@ export const BusMap: React.FC<BusMapProps> = ({
                   <BusIcon className="w-3 h-3 text-emerald-400" />
                   STATIONED FLEET
                 </span>
-                <strong className="font-heading text-sm font-bold text-white block font-mono">
+                <strong className="text-sm font-bold text-white block font-mono">
                   {assignedBuses.length} Buses
                 </strong>
                 <span className="text-[10px] text-emerald-400 block font-mono">
@@ -777,7 +777,7 @@ export const BusMap: React.FC<BusMapProps> = ({
                   <AlertTriangle className="w-3 h-3 text-red-400" />
                   PEOPLE WAITING
                 </span>
-                <strong className={`font-heading text-sm font-bold block font-mono ${
+                <strong className={`text-sm font-bold block font-mono ${
                   assignedBuses.length === 0 ? 'text-red-400' : 'text-amber-400'
                 }`}>
                   {assignedBuses.length === 0

@@ -62,7 +62,7 @@ export const FestivalScenarioControlCenter: React.FC<FestivalScenarioControlCent
   lastUpdateTimestamp = '',
 }) => {
   // Form state
-  const [formData, setFormData] = useState<ScenarioData | null>(null);
+  const [formData, setFormData] = useState<ScenarioData | null>(() => (scenario ? JSON.parse(JSON.stringify(scenario)) : null));
   const [liveWeather, setLiveWeather] = useState<LiveWeatherResponse | null>(null);
   const [isFetchingWeather, setIsFetchingWeather] = useState<boolean>(false);
   const [weatherError, setWeatherError] = useState<string | null>(null);
@@ -137,7 +137,25 @@ export const FestivalScenarioControlCenter: React.FC<FestivalScenarioControlCent
     };
   }, [formData, scenario, hasRunInitialPrediction, onRunPrediction]);
 
-  // Loading fallback
+  // UNCONDITIONAL TOP-LEVEL HOOK: Peak forecast demand calculation
+  // Must execute on every render before any conditional return to prevent React hooks order mismatch
+  const peakForecastDemand = useMemo(() => {
+    if (forecast?.stop_summaries && Object.keys(forecast.stop_summaries).length > 0) {
+      return Object.values(forecast.stop_summaries).reduce((max, s) => Math.max(max, s.peak_demand), 0);
+    }
+    const attendance = formData?.festival_programme.expected_total_attendance ?? scenario?.festival_programme.expected_total_attendance ?? 40000;
+    const fraction = formData?.festival_programme.exiting_passenger_fraction ?? scenario?.festival_programme.exiting_passenger_fraction ?? 0.85;
+    const pax = Math.round(attendance * fraction);
+    return Math.round(pax * 0.35);
+  }, [
+    forecast,
+    formData?.festival_programme.expected_total_attendance,
+    formData?.festival_programme.exiting_passenger_fraction,
+    scenario?.festival_programme.expected_total_attendance,
+    scenario?.festival_programme.exiting_passenger_fraction,
+  ]);
+
+  // Loading fallback: STRICTLY returned only after ALL hooks have executed
   if (!formData) {
     return (
       <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-slate-500 shadow-sm space-y-3">
@@ -313,14 +331,7 @@ export const FestivalScenarioControlCenter: React.FC<FestivalScenarioControlCent
   const sharesSum = Object.values(prog.demand_distribution).reduce((sum, v) => sum + v, 0) * 100;
   const isSharesSumValid = Math.abs(sharesSum - 100) < 1.5;
 
-  // Calculate estimated buses required at peak from forecast if available
-  const peakForecastDemand = useMemo(() => {
-    if (!forecast || !forecast.stop_summaries) {
-      // rough heuristic baseline if no forecast yet
-      return Math.round(totalTransitPax * 0.35);
-    }
-    return Object.values(forecast.stop_summaries).reduce((max, s) => Math.max(max, s.peak_demand), 0);
-  }, [forecast, totalTransitPax]);
+  // Peak forecast demand is computed unconditionally at the top level to adhere to React Rules of Hooks.
 
   // Standard interval capacity ~ 30 passengers per bus per 15-minute window
   const estimatedBusesRequired = Math.max(1, Math.ceil(peakForecastDemand / 30));
@@ -995,7 +1006,7 @@ export const FestivalScenarioControlCenter: React.FC<FestivalScenarioControlCent
       </div>
 
       {/* 3. PROMINENT RUN PREDICTION MAIN ACTION BAR (PHASE 3 & 4) */}
-      <div className="pt-2 border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4 bg-gradient-to-r from-slate-50 via-sky-50/50 to-slate-50 p-4 rounded-xl border border-sky-100">
+      <div className="pt-2 flex flex-col sm:flex-row justify-between items-center gap-4 bg-gradient-to-r from-slate-50 via-sky-50/50 to-slate-50 p-4 rounded-xl border border-sky-100">
         <div className="space-y-0.5 text-center sm:text-left">
           <div className="flex items-center gap-2 justify-center sm:justify-start">
             <TrendingUp className="w-4 h-4 text-sky-700" />

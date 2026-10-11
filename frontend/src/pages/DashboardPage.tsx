@@ -374,7 +374,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
                   Peak-Demand Window
                 </span>
-                <span className="font-heading text-base font-bold text-slate-900 font-mono block">
+                <span className="text-base font-bold text-slate-900 font-mono block">
                   {nextPeakWindow}
                 </span>
                 <span className="text-xs text-slate-500 block">
@@ -386,7 +386,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
                   Est. Buses Required
                 </span>
-                <span className="font-heading text-xl font-bold text-sky-700 font-mono block">
+                <span className="text-xl font-bold text-sky-700 font-mono block">
                   {estimatedRequiredBuses} Buses
                 </span>
                 <span className="text-xs text-slate-500 block">
@@ -400,7 +400,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
                   Shortage / Surplus
                 </span>
-                <span className={`font-heading text-xl font-bold font-mono block ${
+                <span className={`text-xl font-bold font-mono block ${
                   fleetShortfallOrSurplus < 0 ? 'text-amber-700' : 'text-emerald-700'
                 }`}>
                   {fleetShortfallOrSurplus < 0 ? `${fleetShortfallOrSurplus} Buses` : `+${fleetShortfallOrSurplus} Buses`}

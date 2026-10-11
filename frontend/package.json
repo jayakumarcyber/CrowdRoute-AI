@@ -9,7 +9,8 @@
     "test:chart": "tsx test-chart.js",
     "test:constraints": "tsx test-constraints.js",
     "test:time": "tsx test-time.js",
-    "test": "npm run test:chart && npm run test:constraints && npm run test:time"
+    "test:hooks": "tsx test-hooks-regression.ts",
+    "test": "npm run test:chart && npm run test:constraints && npm run test:time && npm run test:hooks"
   },
   "dependencies": {
     "@types/leaflet": "^1.9.22",

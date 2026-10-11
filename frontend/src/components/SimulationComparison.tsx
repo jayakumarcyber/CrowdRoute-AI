@@ -67,7 +67,7 @@ export const SimulationComparison: React.FC<SimulationComparisonProps> = ({ simu
           <span className="block text-xs font-semibold text-slate-500 uppercase">
             Additional Passengers Boarded
           </span>
-          <span className="font-heading text-2xl font-bold text-emerald-700 font-mono">
+          <span className="text-2xl font-bold text-emerald-700 font-mono">
             +{net_comparison.system_additional_passengers_boarded}
           </span>
           <span className="block text-[11px] text-slate-500">
@@ -80,7 +80,7 @@ export const SimulationComparison: React.FC<SimulationComparisonProps> = ({ simu
           <span className="block text-xs font-semibold text-slate-500 uppercase">
             Reduction in People Still Waiting
           </span>
-          <span className="font-heading text-2xl font-bold text-emerald-700 font-mono">
+          <span className="text-2xl font-bold text-emerald-700 font-mono">
             -{net_comparison.system_unmet_demand_reduction}
           </span>
           <span className="block text-[11px] text-slate-500">
@@ -93,7 +93,7 @@ export const SimulationComparison: React.FC<SimulationComparisonProps> = ({ simu
           <span className="block text-xs font-semibold text-slate-500 uppercase">
             Main Hub Peak Queue Relief
           </span>
-          <span className="font-heading text-2xl font-bold text-emerald-700 font-mono">
+          <span className="text-2xl font-bold text-emerald-700 font-mono">
             -{net_comparison.main_hub_peak_queue_reduction}
           </span>
           <span className="block text-[11px] text-slate-500">
@@ -106,7 +106,7 @@ export const SimulationComparison: React.FC<SimulationComparisonProps> = ({ simu
           <span className="block text-xs font-semibold text-slate-500 uppercase">
             Impact on Stop Losing a Bus
           </span>
-          <span className="font-heading text-2xl font-bold text-amber-700 font-mono">
+          <span className="text-2xl font-bold text-amber-700 font-mono">
             +{net_comparison.source_stop_peak_queue_increase}
           </span>
           <span className="block text-[11px] text-slate-500">
