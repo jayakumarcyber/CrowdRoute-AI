@@ -8,13 +8,22 @@ import io
 from typing import Any, Dict, List, Optional, Tuple
 from openpyxl import load_workbook
 
-from backend.app.models import (
-    ActualVsPredictedInterval,
-    ActualVsPredictedSummary,
-    HistoricalRecord,
-    HistoricalUploadResponse,
-    validate_hh_mm_string,
-)
+try:
+    from app.models import (
+        ActualVsPredictedInterval,
+        ActualVsPredictedSummary,
+        HistoricalRecord,
+        HistoricalUploadResponse,
+        validate_hh_mm_string,
+    )
+except ImportError:
+    from backend.app.models import (
+        ActualVsPredictedInterval,
+        ActualVsPredictedSummary,
+        HistoricalRecord,
+        HistoricalUploadResponse,
+        validate_hh_mm_string,
+    )
 
 
 # Column aliases for flexible mapping

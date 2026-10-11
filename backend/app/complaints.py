@@ -8,11 +8,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 
-from backend.app.models import (
-    ComplaintCreate,
-    ComplaintPublicItem,
-    ComplaintResponse,
-)
+try:
+    from app.models import (
+        ComplaintCreate,
+        ComplaintPublicItem,
+        ComplaintResponse,
+    )
+except ImportError:
+    from backend.app.models import (
+        ComplaintCreate,
+        ComplaintPublicItem,
+        ComplaintResponse,
+    )
 
 import os
 import shutil

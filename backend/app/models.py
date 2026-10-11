@@ -521,3 +521,9 @@ class ComplaintPublicItem(BaseModel):
     incident_time: Optional[str] = None
     status: ComplaintStatus
     created_at: str
+
+import sys as _sys
+_curr_mod = _sys.modules.get(__name__)
+if _curr_mod:
+    _sys.modules.setdefault("app.models", _curr_mod)
+    _sys.modules.setdefault("backend.app.models", _curr_mod)

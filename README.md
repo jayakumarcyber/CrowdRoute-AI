@@ -1,191 +1,227 @@
 # CrowdRoute AI 🚌⚡
-
 **Festival Crowd Prediction and Fixed-Fleet Bus Optimization**  
-**Hackathon:** SAKTHI HACKFEST'26 — Generative AI Domain  
-**Target Platform:** Windows 11 | AMD Ryzen 5 | 16 GB RAM | Python 3.12.10 | FastAPI  
-**Repository:** [https://github.com/jayakumarcyber/CrowdRoute-AI.git](https://github.com/jayakumarcyber/CrowdRoute-AI.git)  
+**Hackathon:** SAKTHI HACKFEST'26 — Generative AI / Public Transit Domain  
+**Target Platform:** Windows 11 | AMD Ryzen 5 | Python 3.12 | FastAPI | React 18 | Vite 6 | TypeScript  
+**Repository:** [https://github.com/jayakumarcyber/CrowdRoute-AI.git](https://github.com/jayakumarcyber/CrowdRoute-AI.git)
 
 ---
 
 > [!WARNING]
-> **SYNTHETIC DEMO DATA DISCLAIMER**  
-> All passenger counts, crowd egress curves, road transit times, and vehicle capacity models in this project are strictly **SYNTHETIC PLANNING ESTIMATES**. They are designed for transparent scenario planning, algorithmic evaluation, and hackathon presentation. Never use these models for real-world bus dispatch, traffic policing, or live passenger safety operations.
+> **SYNTHETIC DEMO DATA & SIMULATION DISCLAIMER**  
+> All passenger numbers, crowd egress distributions, road transit durations, and bus capacity estimates in this project are strictly **SYNTHETIC PLANNING ESTIMATES**. They are designed for transparent scenario planning, algorithmic evaluation, and hackathon demonstration. Never use these models for real-world life-critical transit dispatch, traffic policing, or physical passenger safety operations.
 
 ---
 
-## 1. Problem Statement & Motivation
+## 1. Executive Summary & Problem Statement
 
-On the closing night of a major regional temple festival, approximately **40,000 attendees** seek to depart a small town within a narrow **two-hour window** (21:00 to 23:00).
+On the closing night of a major regional temple festival (such as the Karthigai Deepam festival in Tiruvannamalai, Tamil Nadu), approximately **40,000 devotees** depart the venue within a concentrated **two-to-three-hour window** (21:00 to 23:30).
 
-- **The Problem:** The Main Bus Stand (with 12 scheduled buses) rapidly experiences severe crowd surges and crushing queues within 30 minutes of the final event conclusion. Meanwhile, only two kilometres away at the Peripheral Ring Stop, 4 buses sit waiting with virtually zero passengers.
-- **The Core Constraint (Constraint 2):** **The fleet is strictly fixed.** The system cannot invent new buses or deploy emergency off-grid vehicles. Recommendations may *only* redistribute existing buses and must explicitly account for which route or stop loses service as a result of every move.
+- **The Real-World Bottleneck:** The Central Bus Terminal (`STOP_MAIN`), located within 400 metres of the main temple gate, experiences severe crowd surges and platform queues exceeding 2,500 people within 30 minutes of the final ceremony. Meanwhile, only two kilometres away at the North Bypass Ring Stand (`STOP_PERIPHERAL`), multiple buses sit waiting with virtually zero passengers.
+- **The Core Constraint (Constraint 2):** **The bus fleet is strictly fixed.** The transit authority cannot magically conjure extra buses or deploy off-grid vehicles during an active egress rush. Every recommendation may **only redistribute existing buses** and must explicitly quantify the donor-stop service reduction and guarantee minimum safety reserves.
 - **Key Operational Insights:**
-  - *Hint 1:* The festival programme, final event ending time, and weather forecast were known a week in advance.
-  - *Hint 2:* Moving one bus to the right place at the right time is worth more than adding ten buses too late.
+  - *Insight 1:* Festival programmes, ceremony conclusion times, and meteorological forecasts are known in advance, enabling proactive advance staging.
+  - *Insight 2:* Moving one bus to the right stand before the crowd peak occurs provides more relief than dispatching ten buses that arrive after passengers have dispersed or crushed the platform.
 
-CrowdRoute AI provides an explainable, deterministic rule-based demand forecasting and fixed-fleet optimization backend that respects operational safety constraints, provides transparent trade-offs, and quantifies donor-stop service impacts.
+CrowdRoute AI provides an explainable, deterministic rule-based demand forecasting and fixed-fleet optimization system that respects operational safety constraints, provides transparent trade-offs, and quantifies donor-stop service impacts.
 
 ---
 
-## 2. Project Objectives
+## 2. Project Objectives & Target Users
 
-1. **Advance Planning:** Anticipate egress demand using festival schedules and weather scenarios before bottlenecks develop.
-2. **Fixed-Fleet Redistribution:** Relocate idle or surplus vehicles to relieve bottleneck terminals under hard operational constraints.
+1. **Advance Planning:** Forecast festival egress demand curves across 15-minute intervals based on scheduled ceremony conclusion times, weather conditions, and transport usage fractions.
+2. **Fixed-Fleet Redistribution:** Relocate idle or surplus vehicles to relieve bottleneck terminals under hard operational safety constraints.
 3. **Transparent Trade-Off Analysis:** Quantify and display the exact service reduction (initial fleet, remaining fleet, seat capacity drop) at every donor stop.
-4. **Reproducible Comparative Simulation:** Simulate passenger queues, road transit, and boarding constraints side-by-side between the baseline schedule and the optimized schedule under identical starting conditions.
+4. **Reproducible Comparative Simulation:** Simulate passenger queues, road transit, and boarding constraints side-by-side between the baseline schedule and the proposed allocation under identical starting conditions.
+5. **Citizen Reporting & Transparency:** Provide a public grievance submission portal with SQLite persistence and privacy masking for crowd reporting.
+
+**Target Users:**
+- State Transport Corporation (TNSTC) Operations Controllers.
+- District Police & Crowd Safety Management Teams.
+- Festival Transit Planning Committees.
+- Traveling Citizens & Devotees.
 
 ---
 
-## 3. Current Development Phase & Scope
+## 3. Key Features
 
-### Current Phase: **Full-Stack Government Transport Portal (COMPLETED)**
-
-| Layer | Technology | Status |
-| :--- | :--- | :--- |
-| **Backend Engine** | Python 3.12, FastAPI, Pydantic v2, SQLite, Pytest | **100% COMPLETE & VERIFIED (41/41 Tests Passed)** |
-| **Frontend Portal** | React 18, TypeScript, Vite 6, Tailwind CSS, Leaflet OSM, Recharts | **100% COMPLETE & VERIFIED (TypeScript & Production Build Passing)** |
-| **Constraint 1 (Live Updates)** | Automatic recalculation on weather / event delay changes | **100% OPERATIONAL (No manual re-run needed)** |
-| **Constraint 2 (Fixed Fleet)** | Strict 16-bus inventory conservation & dual-sided trade-offs | **100% AUDITED & VERIFIED** |
-| **Citizen Grievance** | Persistent SQLite DB, Public Masked Feed, Reference ID Tracking | **100% OPERATIONAL (`/api/complaints`)** |
-| **Interactive Map** | Leaflet + OpenStreetMap, Dynamic Risk Colors, Relocation Polylines | **100% OPERATIONAL & RESPONSIVE** |
+- **Strict Fixed-Fleet Invariant (Constraint 2):** $N$ buses configured = $N$ buses accounted for ($16 = 16$). Zero phantom buses created, zero buses lost, and zero double-allocations.
+- **Live Festival Operations Controller (Constraint 1):** Real-time operational adjustments (Clear, Cloudy, Rainy, Heavy Rain, On Schedule, +15m, +30m, +60m delays, Rain Started). Triggers automatic asynchronous recalculation of demand curves and bus redeployments with out-of-order request sequence protection.
+- **Real-Time Live Weather Integration (Open-Meteo):** Integrates live ground meteorological observations for Tiruvannamalai (`12.2253° N, 79.0747° E`) via Open-Meteo with 10-minute caching, HTTP error handling, and offline fallback.
+- **Interactive 3-Column Bus Map GIS:** Real-time Leaflet OpenStreetMap rendering with administrative hierarchy controls, layer toggles, crowd-risk stop markers, bus markers, schematic relocation corridors, and deep navy capacity metrics.
+- **Operational Bus Timetable:** Clear 12-hour AM/PM departure and arrival times, travel durations (handling midnight crossing), destination benefits, and source minimum service compliance.
+- **Comprehensive Festival Scenario Editor:** Configure festival name, expected attendance, event start/end dates and times, delay minutes, timezone, public transit fraction, forecast horizon (24/48/72h), and stop demand shares.
+- **Citizen Grievance & Complaint Portal:** Report issues (Overcrowding, Bus Delay, Long Waiting Time, Wheelchair Access) with automated reference ID generation (`CR-2026-XXXX`), status tracking, and privacy masking.
+- **Discrete Interval Boarding Simulation:** Side-by-side comparative simulation quantifying queue length reductions and wait time improvements.
 
 ---
 
-## 4. Implemented Features
-
-- **Official Constraint 1 — Live Festival Operations Controller (`LiveFestivalUpdates.tsx`):** Reacts automatically to live inputs during the event (Clear/Cloudy/Rainy/Heavy Rain, On Schedule/+15m/+30m/+60m delay, one-click quick actions). Automatically triggers asynchronous recalculation of demand forecasts, peak timing, and bus redeployments with out-of-order request sequence protection.
-- **Official Constraint 2 — Bus Movement Impact (`BusMovementImpact.tsx`):** Enforces strict fixed-fleet conservation (16 buses before = 16 buses after; zero phantom buses). Displays comprehensive dual-sided impact for every move (destination extra boarding capacity vs source-stop buses lost, remaining capacity, and protected minimum service).
-- **Synthetic Festival Scenario Engine (`data/demo_scenario.json`):** Configurable scenario containing 16 unique buses (`BUS-M01`–`BUS-M12` at Main Stand, `BUS-P01`–`BUS-P04` at Peripheral Stop), 3 stops, road travel time matrix, and event timeline.
-- **Demand Estimation Engine (`app/forecast.py`):** Rule-based baseline modeling crowd departures across 15-minute intervals. Egress follows a Gaussian surge centered on the scheduled event ending time. If the event is delayed, the surge curve shifts dynamically.
-- **Constrained Greedy Fixed-Fleet Allocator (`app/allocator.py`):** Evaluates candidate movements against 7 hard constraints. Enforces strict fleet conservation: zero invented buses, zero duplicates, zero dropped buses.
-- **Trade-off Analysis Engine (`app/tradeoffs.py`):** Produces structured trade-off records for each move, detailing donor stop capacity changes, remaining buses, minimum service compliance, and net system benefit.
-- **Deterministic Discrete Simulator (`app/simulator.py`):** Runs side-by-side discrete-time simulations comparing the original fixed schedule against the recommended allocation under identical arrivals.
-- **Interactive Bus Map (`frontend/src/components/BusMap.tsx`):** Real-time OpenStreetMap rendering with crowd-risk colored stop pins, stationed bus tallies, approved relocation dashed corridors, and detailed stop inspection.
-- **Citizen Grievance Portal (`app/complaints.py`, `/api/complaints`):** Public complaint submission form, automated reference ID generation (`CR-2026-XXXX`), privacy masking of contact details, status tracking, and persistent SQLite storage.
-- **FastAPI REST Application (`app/main.py`):** Exposes endpoints with strict Pydantic v2 schemas and validation error handling.
-- **Automated Pytest Suite (`tests/`):** 41 unit and API tests validating all 12 official hackathon constraint rules, dynamic inputs, complaint handling, weather surge impacts, and event delays.
-
----
-
-## 5. System Architecture
+## 4. System Architecture
 
 ```mermaid
 graph TD
-    Client["Client / API Consumer / Evaluator"] -->|"HTTP / JSON"| API["FastAPI Application (main.py)"]
+    User["Web Browser (React 18 + Vite 6 + Tailwind CSS)"] -->|"REST API / JSON"| API["FastAPI Backend (Uvicorn)"]
 
-    subgraph Backend Engine ["CrowdRoute AI Backend Engine"]
+    subgraph Backend Engine ["CrowdRoute AI Engine"]
         API -->|"GET /api/scenario"| ScenarioLoader["Scenario Data (demo_scenario.json)"]
+        API -->|"GET /api/weather/live"| WeatherService["Open-Meteo Live Weather Service (weather.py)"]
         API -->|"POST /api/forecast"| ForecastEng["Demand Estimation Engine (forecast.py)"]
         API -->|"POST /api/allocate"| AllocatorEng["Fixed-Fleet Allocator (allocator.py)"]
-        API -->|"POST /api/simulate"| SimEng["Discrete Simulator (simulator.py)"]
+        API -->|"POST /api/simulate"| SimEng["Comparative Discrete Simulator (simulator.py)"]
+        API -->|"POST /api/complaints"| ComplaintsDB["Citizen Grievance SQLite DB (complaints.py)"]
 
-        ForecastEng -->|"Egress Surge Curves"| AllocatorEng
+        WeatherService -->|"Live Met Observations"| API
+        ForecastEng -->|"Surge Demand Curves"| AllocatorEng
         ScenarioLoader -->|"Fleet & Travel Matrix"| AllocatorEng
 
         AllocatorEng -->|"Validate Candidates"| TradeoffEng["Trade-off Analysis Engine (tradeoffs.py)"]
-        TradeoffEng -->|"Hard Constraints Audit"| AllocatorEng
+        TradeoffEng -->|"Hard Constraint Audits"| AllocatorEng
 
-        AllocatorEng -->|"Recommended Moves"| SimEng
-        ScenarioLoader -->|"Identical Starting State"| SimEng
+        AllocatorEng -->|"Approved Moves"| SimEng
+        ScenarioLoader -->|"Identical Baseline"| SimEng
 
-        SimEng -->|"Run A: Baseline Schedule"| DiscreteRunner["Discrete Interval Queue Runner"]
-        SimEng -->|"Run B: Proposed Allocation"| DiscreteRunner
+        SimEng -->|"Side-by-Side Results"| API
     end
-
-    DiscreteRunner -->|"Comparative Metrics"| API
-    AllocatorEng -->|"Audit & Moves"| API
-    ForecastEng -->|"Interval Forecasts"| API
 ```
 
 ---
 
-## 6. System Workflow & Decision Logic
+## 5. End-to-End Data Flow
 
 ```mermaid
-flowchart TD
-    Start(["1. Receive Scenario / Override Parameters"]) --> StepA["2. Calculate 15-min Egress Weights centered on Event End Time"]
-    StepA --> StepB["3. Compute Stop Demand Forecasts & Peak Deficits"]
-    StepB --> StepC{"Deficit > 0 at Target Stop?"}
+sequenceDiagram
+    autonumber
+    actor Operator as Transit Controller
+    participant UI as React Frontend
+    participant API as FastAPI Backend
+    participant Weather as Open-Meteo API
+    participant Forecast as Forecast Engine
+    participant Alloc as Allocator Engine
+    participant Sim as Queue Simulator
 
-    StepC -- No --> NoNeed["No Allocation Needed"]
-    StepC -- Yes --> StepD["4. Identify Candidate Donor Stops with Surplus Capacity"]
-
-    StepD --> StepE["5. For Each Candidate Bus, Evaluate 7 Hard Constraints"]
-    
-    subgraph Hard Constraints Gate ["Trade-off Engine Constraints"]
-        C1["C1: Source & Dest Valid in Network?"]
-        C2["C2: Bus Status == 'available'?"]
-        C3["C3: Destination Authorized in Route Compatibility?"]
-        C4["C4: Departure + Travel Time < Peak Demand Interval?"]
-        C5["C5: Remaining Source Buses >= Minimum Service Baseline?"]
-        C6["C6: Net Benefit > 0 (Relief > Donor Loss)?"]
-    end
-
-    StepE --> C1 --> C2 --> C3 --> C4 --> C5 --> C6
-
-    C6 -- Fails Any Constraint --> Reject["Record RejectedCandidate with Reason"]
-    C6 -- Passes All Constraints --> Accept["Record Recommended BusMove & Update State"]
-
-    Accept --> Audit["6. Audit Fleet Conservation: Initial Count == Final Count == 16"]
-    Reject --> Audit
-
-    Audit --> Sim["7. Simulate Baseline vs. Proposed Schedules Side-by-Side"]
-    Sim --> Response(["8. Return Structured API Response with Trade-Off Explanations"])
+    Operator->>UI: Changes Event Delay (+30m) or Weather (Rainy)
+    UI->>UI: Debounce (600ms) & Update Status to 'Updating...'
+    UI->>API: POST /api/forecast (Updated Scenario)
+    API->>Forecast: Recalculate 15-min Egress Curves
+    Forecast-->>API: Stop Demand & Peak Deficits
+    API-->>UI: Forecast Response
+    UI->>API: POST /api/allocate (Scenario + Forecast)
+    API->>Alloc: Greedy Constrained Redistribution
+    Alloc->>Alloc: Audit Fleet Conservation (16 == 16)
+    Alloc-->>API: Approved Moves & Trade-offs
+    API-->>UI: Allocate Response
+    UI->>API: POST /api/simulate (Scenario + Moves)
+    API->>Sim: Discrete Boarding Queue Simulation
+    Sim-->>API: Baseline vs. Proposed Metrics
+    API-->>UI: Simulation Response
+    UI->>UI: Update Map, Timetable, Charts & Set Status to 'Up to Date'
 ```
 
 ---
 
-## 7. Technology Stack
+## 6. Technology Stack
 
-| Technology | Version | Purpose in CrowdRoute AI |
-| :--- | :--- | :--- |
-| **Python** | 3.12.10 | Core runtime environment. |
-| **FastAPI** | 0.141.1 | High-performance asynchronous REST API framework. |
-| **Uvicorn** | 0.52.4 | ASGI production-grade web server. |
-| **Pydantic** | 2.13.4 | Strict domain modeling, data parsing, and schema validation. |
-| **Pytest** | 9.1.1 | Automated testing framework for constraint validation. |
-| **HTTPX** | 0.28.1 | HTTP client for integration test execution (`TestClient`). |
-
-*Note: Heavy data libraries like Pandas and NumPy were intentionally omitted to avoid unnecessary dependency overhead and ensure fast, deterministic execution on resource-constrained hardware.*
+| Layer | Component | Version | Role in CrowdRoute AI |
+| :--- | :--- | :--- | :--- |
+| **Backend** | Python | 3.12.10 | Core programming language runtime. |
+| **Backend** | FastAPI | 0.115.6 | Asynchronous REST API framework. |
+| **Backend** | Uvicorn | 0.32.1 | High-concurrency ASGI web server. |
+| **Backend** | Pydantic | 2.10.4 | Strict domain modeling, validation, and serialization. |
+| **Backend** | Pytest | 9.1.1 | Unit, constraint, and API regression testing. |
+| **Backend** | HTTPX | 0.28.1 | Asynchronous HTTP client for live Open-Meteo weather and tests. |
+| **Backend** | SQLite3 | Built-in | Zero-configuration database for citizen complaints (`complaints.db`). |
+| **Frontend** | React | 18.3.1 | Component-based UI library. |
+| **Frontend** | TypeScript | 5.6.3 | Static type checking and schema contracts. |
+| **Frontend** | Vite | 6.4.4 | Ultra-fast frontend build tooling and dev server. |
+| **Frontend** | Tailwind CSS | 3.4.16 | Utility-first styling with custom scroll and animations. |
+| **Frontend** | Leaflet | 1.9.4 | Open-source interactive map rendering with OpenStreetMap tiles. |
+| **Frontend** | Recharts | 2.13.3 | Responsive SVG data visualization for demand curves. |
+| **Frontend** | Lucide React | 0.460.0 | High-contrast iconography. |
 
 ---
 
-## 8. Project Directory Structure
+## 7. Project Directory Structure
 
-```
+```text
 CrowdRoute AI/
-├── .vscode/
-│   └── settings.json         # VS Code / Antigravity Python interpreter configuration
 ├── backend/
 │   ├── app/
-│   │   ├── __init__.py       # Package definition
-│   │   ├── main.py           # FastAPI REST application & endpoints
-│   │   ├── models.py         # Pydantic schemas & strict input validation
-│   │   ├── forecast.py       # Rule-based demand estimation engine
-│   │   ├── allocator.py      # Fixed-fleet constrained reallocation engine
-│   │   ├── tradeoffs.py      # Operational constraint & trade-off engine
-│   │   └── simulator.py      # Side-by-side queue & transit simulator
-│   ├── data/
-│   │   └── demo_scenario.json# Synthetic festival scenario (16 buses, 3 stops)
-│   ├── tests/
 │   │   ├── __init__.py
-│   │   ├── test_all.py       # Pytest suite verifying all 12 core rules
-│   │   └── test_api.py       # FastAPI HTTP endpoint tests
-│   ├── requirements.txt      # Python dependencies
-│   └── README.md             # Detailed backend technical documentation
-├── .env.example              # Safe environment variable template
-├── .gitignore                # Git exclusions (caches, .venv, local settings)
-├── LICENSE                   # MIT License
-└── README.md                 # Root project documentation (this file)
+│   │   ├── main.py              # FastAPI application and route declarations
+│   │   ├── models.py            # Pydantic schemas, validation, and domain contracts
+│   │   ├── forecast.py          # Rule-based Gaussian demand prediction engine
+│   │   ├── allocator.py         # Constrained greedy fixed-fleet reallocation engine
+│   │   ├── tradeoffs.py         # Hard constraint gates and dual-sided impact audit
+│   │   ├── simulator.py         # Discrete interval queue and boarding simulator
+│   │   ├── weather.py           # Real-time Open-Meteo live weather service with cache
+│   │   ├── complaints.py        # SQLite citizen grievance persistence and lookup
+│   │   ├── historical.py        # Historical CSV/Excel file validation and ingestion
+│   │   └── live_data.py         # External telemetry status checker
+│   ├── data/
+│   │   ├── demo_scenario.json   # Reproducible 16-bus baseline scenario
+│   │   └── complaints.db        # SQLite database for citizen reports
+│   ├── tests/
+│   │   ├── test_all.py          # Baseline test suite
+│   │   ├── test_api.py          # REST API endpoint tests
+│   │   ├── test_complaints.py   # Complaint submission and tracking tests
+│   │   ├── test_constraints.py  # Fleet conservation and constraint tests
+│   │   ├── test_dynamic.py      # Weather surge and delay shift tests
+│   │   ├── test_portal_improvements.py # Portal regression tests
+│   │   └── test_weather_and_scenario.py # Live weather and scenario input tests
+│   └── requirements.txt         # Backend Python dependencies
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── AdministrativeStepBar.tsx # Step 1-4 hierarchy filter bar
+│   │   │   ├── BusAllocation.tsx         # Suggested bus changes & trade-offs
+│   │   │   ├── BusMap.tsx                # 3-column GIS Leaflet bus map
+│   │   │   ├── BusMovementImpact.tsx     # Fleet conservation audit & impact breakdown
+│   │   │   ├── BusTimetable.tsx          # 12-hour AM/PM bus deployment timetable
+│   │   │   ├── CivicModals.tsx           # Report Problem and Track Grievance modals
+│   │   │   ├── ComplaintSection.tsx      # Public complaints submission & feed
+│   │   │   ├── CrowdForecast.tsx         # Crowd demand forecast overview
+│   │   │   ├── DataSourceStatus.tsx      # Telemetry feed provenance card
+│   │   │   ├── DemandChart.tsx           # Recharts demand and carrying capacity graph
+│   │   │   ├── ErrorBoundary.tsx         # React Error Boundary with safe reset
+│   │   │   ├── Footer.tsx                # Government portal footer
+│   │   │   ├── Header.tsx                # Two-tier header with civic quick action sub-bar
+│   │   │   ├── HeroSection.tsx           # Aerial transport hero section with dual CTAs
+│   │   │   ├── HistoricalUpload.tsx      # Past crowd CSV/Excel drag-and-drop upload
+│   │   │   ├── LiveFestivalUpdates.tsx   # Live operations controller (weather & delays)
+│   │   │   ├── ScenarioForm.tsx          # Comprehensive scenario & fleet editor
+│   │   │   ├── SimulationComparison.tsx  # Side-by-side boarding queue simulation
+│   │   │   └── SummaryMetrics.tsx        # 4-card metric strip & live telemetry bar
+│   │   ├── pages/
+│   │   │   ├── DashboardPage.tsx         # Operations controller dashboard with 7 tabs
+│   │   │   ├── DataSourcesPage.tsx       # Data sources and provenance page
+│   │   │   └── HomePage.tsx              # Portal home page
+│   │   ├── services/
+│   │   │   └── api.ts                    # Typed API client
+│   │   ├── types/
+│   │   │   └── api.ts                    # TypeScript domain interfaces
+│   │   ├── utils/
+│   │   │   ├── chartData.ts              # Demand chart data transformations
+│   │   │   └── timeFormat.ts             # 12-hour AM/PM parsing and duration utilities
+│   │   ├── App.tsx                       # Root application component with routing
+│   │   ├── index.css                     # Tailwind CSS, smooth scrolling, scroll margins
+│   │   └── main.tsx                      # Vite React entry point
+│   ├── package.json                      # Frontend dependencies and npm scripts
+│   ├── test-chart.js                     # Chart data transformation test suite
+│   ├── test-constraints.js               # Constraint 1 & 2 test suite
+│   └── test-time.js                      # Time parsing and duration test suite
+├── .env.example                          # Environment variable configuration template
+├── .gitignore                            # Git exclusion rules
+└── README.md                             # Comprehensive documentation (this file)
 ```
 
 ---
 
-## 9. Prerequisites & Environment Setup
+## 8. Prerequisites & Installation
 
-- **Operating System:** Windows 11 (or compatible Linux/macOS)
-- **Python:** Python 3.12.x
-- **Shell:** PowerShell on Windows 11
+### Prerequisites
+- **Operating System:** Windows 10/11, macOS, or Linux.
+- **Python:** Python 3.11 or 3.12 (Python 3.12.10 recommended).
+- **Node.js:** Node.js v18+ and npm v9+ (Node 20/22 recommended).
+- **Git:** Git version 2.30+.
 
 ### Step 1: Clone the Repository
 ```powershell
@@ -193,324 +229,228 @@ git clone https://github.com/jayakumarcyber/CrowdRoute-AI.git
 cd "CrowdRoute-AI"
 ```
 
-### Step 2: Create and Activate Virtual Environment
+### Step 2: Setup Python Backend Environment
 ```powershell
+# Create Python virtual environment
 python -m venv .venv
+
+# Activate virtual environment (PowerShell)
 .\.venv\Scripts\Activate.ps1
+# (Or on CMD: .\.venv\Scripts\activate.bat)
+# (Or on Linux/macOS: source .venv/bin/activate)
+
+# Upgrade pip and install dependencies
+python -m pip install --upgrade pip
+pip install -r backend\requirements.txt
 ```
 
-### Step 3: Install Dependencies
+### Step 3: Setup React Frontend Environment
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
-```
-
----
-
-## 10. How to Run the Project Locally
-
-### Start the FastAPI Server
-From the project root:
-```powershell
-.\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --reload
-```
-
-- **Interactive API Documentation (Swagger UI):** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-- **Alternative Redoc Documentation:** [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
-- **Health Check Endpoint:** [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
-
----
-
-## 11. API Documentation & Example Payloads
-
-### Endpoint Summary
-
-| Method | Path | Description |
-| :--- | :--- | :--- |
-| `GET` | `/health` | Service health status, domain metadata, and disclaimers. |
-| `GET` | `/api/scenario` | Returns active synthetic scenario (stops, buses, travel matrix). |
-| `POST` | `/api/forecast` | Generates 15-minute interval demand estimates by stop. |
-| `POST` | `/api/allocate` | Evaluates candidates and returns safe fixed-fleet relocations. |
-| `POST` | `/api/simulate` | Side-by-side simulation comparing baseline vs. proposed schedules. |
-
----
-
-### Example: `POST /api/forecast`
-**Request:**
-```json
-{
-  "scheduled_event_end_time_override": "21:30",
-  "weather_condition_override": "clear",
-  "attendance_override": 40000
-}
-```
-
-**Response (HTTP 200 OK):**
-```json
-{
-  "scenario_id": "SCN-SAKTHI-FEST-2026-01",
-  "disclaimer": "SYNTHETIC DEMO DATA ONLY - Not real passenger measurements",
-  "event_end_time": "21:30",
-  "weather_condition": "clear",
-  "intervals": [
-    {
-      "stop_id": "STOP_MAIN",
-      "interval_index": 2,
-      "start_time": "21:30",
-      "end_time": "21:45",
-      "low_estimate": 6872,
-      "central_estimate": 8085,
-      "high_estimate": 9702,
-      "baseline_capacity": 360,
-      "deficit_surplus": 7725,
-      "risk_level": "CRITICAL",
-      "provenance_note": "Synthetic rule-based estimate: 90.0% stop split, weight=0.3250 from egress curve centered at event end 21:30. Weather=clear (concentration=1.0)."
-    }
-  ],
-  "stop_summaries": {
-    "STOP_MAIN": {
-      "stop_id": "STOP_MAIN",
-      "total_demand": 30600,
-      "peak_interval": "21:30-21:45",
-      "peak_demand": 8085,
-      "baseline_scheduled_capacity": 2880,
-      "overall_risk": "CRITICAL"
-    }
-  },
-  "assumptions": [
-    "Synthetic demand distribution: Total attendance assumed 40,000 people.",
-    "85% of attendees leave via municipal transit network.",
-    "Event end time: 21:30; egress curve standard deviation: 24.0 minutes."
-  ],
-  "data_provenance": "Deterministic rule-based Gaussian egress model over synthetic scenario data."
-}
-```
-
----
-
-### Example: `POST /api/allocate`
-**Request:**
-```json
-{
-  "max_moves": 3
-}
-```
-
-**Response (HTTP 200 OK):**
-```json
-{
-  "scenario_id": "SCN-SAKTHI-FEST-2026-01",
-  "disclaimer": "SYNTHETIC DEMO ESTIMATE ONLY - Fixed Fleet Heuristic Allocation",
-  "status": "SUCCESS",
-  "summary": "Recommended 3 safe fixed-fleet reallocations relieving critical crowd bottlenecks while preserving source minimum service levels. Fleet inventory strictly conserved at 16 vehicles.",
-  "recommended_moves": [
-    {
-      "bus_id": "BUS-P01",
-      "source_stop_id": "STOP_PERIPHERAL",
-      "destination_stop_id": "STOP_MAIN",
-      "departure_time": "21:00",
-      "estimated_arrival_time": "21:15",
-      "target_peak_interval": "21:30-21:45",
-      "destination_need_reason": "Destination stop 'Main Bus Stand (Central Terminal)' (STOP_MAIN) faces severe peak demand deficit of 7725 passengers during interval 21:30-21:45.",
-      "estimated_destination_benefit": 60,
-      "source_service_before": 4,
-      "source_service_after": 3,
-      "source_service_impact_description": "Source stop 'Peripheral Ring Stop (North Bypass)' (STOP_PERIPHERAL) loses 1 bus (Bus BUS-P01, capacity 60). Scheduled fleet decreases from 4 to 3 buses (capacity 240 -> 180). Minimum safety requirement of 1 bus(es) is satisfied.",
-      "delayed_or_unserved_passengers_at_source": 0,
-      "constraints_passed": [
-        "HARD_CONSTRAINT_SOURCE_IMPACT_KNOWABILITY: Source impact fully quantified",
-        "HARD_CONSTRAINT_DESTINATION_VALIDITY: Destination verified in network",
-        "HARD_CONSTRAINT_BUS_AVAILABILITY: Vehicle status confirmed available",
-        "HARD_CONSTRAINT_ROUTE_COMPATIBILITY: Route and stop authorized for vehicle",
-        "HARD_CONSTRAINT_PEAK_ARRIVAL_WINDOW: Bus arrives at 21:15 ahead of peak 21:30-21:45",
-        "HARD_CONSTRAINT_MINIMUM_SOURCE_SERVICE: Source retains 3 buses (min 1 required)",
-        "HARD_CONSTRAINT_NET_BENEFIT_POSITIVE: Net gain of +60 passengers accommodated"
-      ],
-      "assumptions": [
-        "Travel time: 15 mins (includes weather multiplier 1.00).",
-        "Bus boards at maximum passenger rating of 60.",
-        "Source passenger demand for period estimated at 45 passengers."
-      ],
-      "status": "RECOMMENDED"
-    }
-  ],
-  "rejected_moves": [],
-  "fleet_audit": {
-    "initial_fleet_count": 16,
-    "final_fleet_count": 16,
-    "inventory_conserved": true,
-    "duplicate_buses_detected": false,
-    "invented_buses_detected": false,
-    "missing_buses_detected": false,
-    "details": "Initial fleet: 16 vehicles. Final fleet: 16 vehicles. Moved vehicles: 3. Inventory conservation: PASSED."
-  }
-}
-```
-
----
-
-### Example: Error Handling (Validation Failure)
-When invalid input is supplied (e.g. malformed time format `not-a-time`):
-```json
-{
-  "detail": [
-    {
-      "type": "string_pattern_mismatch",
-      "loc": ["body", "scheduled_event_end_time_override"],
-      "msg": "String should match pattern '^\\d{2}:\\d{2}$'",
-      "input": "not-a-time"
-    }
-  ]
-}
-```
-HTTP Status: `422 Unprocessable Entity`
-
----
-
-## 12. Synthetic Data Sources & Modeling Assumptions
-
-1. **Configured Fleet Inventory:** The demo scenario defines an inventory of **16 buses**:
-   - `BUS-M01` through `BUS-M12` stationed at Main Bus Stand (Capacity: 60-65 passengers).
-   - `BUS-P01` through `BUS-P04` stationed at Peripheral Ring Stop (Capacity: 60 passengers).
-2. **Attendance Model:** Total expected attendance is 40,000, with 85% departing via municipal public transit over a two-hour window (21:00 to 23:00).
-3. **Egress Surge Distribution:** Departures follow a Gaussian egress curve centered 7.5 minutes after the event conclusion time (`21:30`), with a base standard deviation of 24 minutes.
-4. **Weather Scenarios:** Clear weather uses standard timing; rain modes compress the egress surge into a narrower window and apply transit slowdown multipliers.
-5. **Discrete Intervals:** Calculations use 15-minute time steps for operational realism.
-
----
-
-## 13. How to Run the Application (Separate Terminals)
-
-### Terminal 1: Start FastAPI Backend Server
-```powershell
-# In project root:
-.\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --reload
-```
-- Backend REST API: `http://127.0.0.1:8000`
-- Interactive OpenAPI Docs: `http://127.0.0.1:8000/docs`
-
-### Terminal 2: Start React + TypeScript Frontend
-```powershell
-# In frontend directory:
 cd frontend
 npm install
-npm run dev
+cd ..
 ```
-- React Frontend Portal: `http://localhost:5173`
-- All `/api` calls are automatically proxied by Vite to `http://127.0.0.1:8000`.
 
 ---
 
-## 14. Testing Instructions & Test Results
+## 9. How to Run the Project Locally
 
-### Execute Complete Pytest Suite
+You will run the backend and frontend in two separate terminal windows.
+
+### Terminal 1: Start the Python FastAPI Backend
 ```powershell
-.\.venv\Scripts\python.exe -m pytest backend\tests -v
+cd "D:\CrowdRoute AI"
+.\.venv\Scripts\Activate.ps1
+python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
+- **Backend API Base:** `http://127.0.0.1:8000`
+- **Interactive Swagger Docs:** `http://127.0.0.1:8000/docs`
+- **Redoc Documentation:** `http://127.0.0.1:8000/redoc`
+- **Health Check Endpoint:** `http://127.0.0.1:8000/health`
 
-### Actual Test Results (32 Passed, 0 Failed)
+### Terminal 2: Start the React + Vite Frontend
+```powershell
+cd "D:\CrowdRoute AI\frontend"
+npm run dev
+```
+- **Frontend URL:** `http://localhost:5173/`
 
-| Test Module & Test Name | Verification Focus | Result |
+Open your web browser and navigate to `http://localhost:5173/`.
+
+---
+
+## 10. Environment Variables & Configuration
+
+Create a `.env` file in the project root if custom URLs are needed:
+```env
+# Optional external telemetry configuration (defaults to open public feeds)
+LIVE_WEATHER_API_URL=
+WEATHER_API_KEY=
+GTFS_REALTIME_FEED_URL=
+PORT=8000
+HOST=127.0.0.1
+```
+*Note: Real-time weather uses Open-Meteo which requires **zero API keys** and operates out-of-the-box.*
+
+---
+
+## 11. Verified API Endpoints
+
+| Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| `test_all.py::test_1_fleet_count_remains_exactly_unchanged` | Fleet count remains exactly unchanged before and after allocation | **PASSED** |
-| `test_all.py::test_2_no_bus_duplicated_or_invented` | Strict inventory conservation; zero phantom buses | **PASSED** |
-| `test_all.py::test_3_unavailable_buses_cannot_be_moved` | Offline/maintenance buses cannot be relocated | **PASSED** |
-| `test_all.py::test_4_incompatible_routes_are_rejected` | Route compatibility & unauthorized stops enforced | **PASSED** |
-| `test_all.py::test_5_bus_arriving_after_peak_rejected` | Late-arriving buses rejected | **PASSED** |
-| `test_all.py::test_6_explicit_source_service_impact` | Donor stop capacity loss explicitly reported | **PASSED** |
-| `test_all.py::test_7_violating_minimum_source_service_rejected` | Donor minimum service thresholds enforced | **PASSED** |
-| `test_all.py::test_8_missing_source_service_prevents_unsafe_recommendation` | Missing donor service data blocks recommendations | **PASSED** |
-| `test_all.py::test_9_no_feasible_move_returns_no_safe_move` | Transparent NO_SAFE_MOVE when constrained | **PASSED** |
-| `test_all.py::test_10_invalid_inputs_rejected` | Negative capacities and empty IDs rejected | **PASSED** |
-| `test_all.py::test_11_delaying_event_shifts_demand_peak` | Dynamic peak shifting under postponed event | **PASSED** |
-| `test_all.py::test_12_simulation_identical_initial_fleet_and_demand` | Fair before/after simulation under identical arrivals | **PASSED** |
-| `test_all.py::test_custom_scenarios_in_forecasting_and_simulation` | Custom scenario propagation across modules | **PASSED** |
-| `test_all.py::test_capacity_consistency_including_60_and_65_seat_buses` | Standardized floor(capacity/2) boarding rates | **PASSED** |
-| `test_all.py::test_semantic_validation_rejects_invalid_hh_mm_times` | Strict 24-hr HH:MM validation | **PASSED** |
-| `test_api.py::test_health_endpoint` | `GET /health` service metadata | **PASSED** |
-| `test_api.py::test_scenario_endpoint` | `GET /api/scenario` returns baseline scenario | **PASSED** |
-| `test_api.py::test_forecast_endpoint` | `POST /api/forecast` interval demand forecasts | **PASSED** |
-| `test_api.py::test_allocate_endpoint` | `POST /api/allocate` fleet optimization & audit | **PASSED** |
-| `test_api.py::test_simulate_endpoint` | `POST /api/simulate` comparative discrete simulation | **PASSED** |
-| `test_api.py::test_invalid_input_rejected` | Malformed inputs trigger HTTP 422 error | **PASSED** |
-| `test_dynamic.py::test_changing_attendance_scales_predictions` | Attendance scaling dynamically shifts volume | **PASSED** |
-| `test_dynamic.py::test_changing_event_timing_shifts_peak` | Delayed event moves peak forecast intervals | **PASSED** |
-| `test_dynamic.py::test_changing_bus_availability_alters_allocator` | Fleet status updates alter recommendations | **PASSED** |
-| `test_dynamic.py::test_changing_demand_distribution_shifts_bottlenecks` | Stop share edits redirect allocation targets | **PASSED** |
-| `test_dynamic.py::test_historical_csv_calibration_and_evaluation` | Historical CSV calibration & MAPE evaluation | **PASSED** |
-| `test_dynamic.py::test_malformed_historical_files_rejected` | Corrupt or invalid CSVs cleanly rejected | **PASSED** |
-| `test_dynamic.py::test_user_data_mode_validation` | User data mode field completeness validation | **PASSED** |
-| `test_dynamic.py::test_synthetic_labels_distinction` | Honest synthetic vs user data disclosures | **PASSED** |
-| `test_dynamic.py::test_fixed_fleet_conservation_under_dynamic_inputs` | Strict conservation across dynamic inputs | **PASSED** |
-| `test_dynamic.py::test_live_data_status_truthful` | Real live weather & transit status reports | **PASSED** |
-| `test_dynamic.py::test_api_historical_upload_and_validation` | `POST /api/historical/upload` end-to-end | **PASSED** |
+| `GET` | `/health` | System health, service status, and operational mode metadata. |
+| `GET` | `/api/scenario` | Returns the active baseline festival scenario (stops, fleet, matrix). |
+| `POST` | `/api/validate/scenario` | Validates user-defined scenario fields. |
+| `GET` | `/api/weather/live` | Real-time meteorological telemetry for Tiruvannamalai from Open-Meteo. |
+| `GET` | `/api/live/status` | Live data telemetry status report for external feeds. |
+| `POST` | `/api/forecast` | Computes 15-minute crowd egress forecasts per stop. |
+| `POST` | `/api/allocate` | Evaluates candidates and returns safe fixed-fleet relocations. |
+| `POST` | `/api/simulate` | Side-by-side queue simulation comparing baseline vs. proposed schedules. |
+| `POST` | `/api/complaints` | Submits a citizen transport complaint into SQLite storage. |
+| `GET` | `/api/complaints` | Returns recent public complaints with citizen phone/email masked. |
+| `GET` | `/api/complaints/{reference_id}` | Tracks complaint status by reference ID (e.g. `CR-2026-FD4A8`). |
+| `POST` | `/api/historical/upload` | Validates and ingests historical passenger CSV/Excel files. |
+| `GET` | `/api/historical/sample` | Downloads sample historical festival passenger CSV. |
 
-### Frontend TypeScript & Production Build Verification
+---
+
+## 12. Crowd Prediction Methodology
+
+The crowd demand forecasting engine (`backend/app/forecast.py`) uses a transparent, rule-based **Gaussian distribution model**:
+
+1. **Total Egress Calculation:**  
+   $$\text{Total Egress Passengers} = \text{Expected Attendance} \times \text{Transit Fraction}$$
+   *(e.g., $40,000 \times 0.85 = 34,000\text{ passengers})$*
+
+2. **Temporal Distribution:**  
+   Passenger departures across 15-minute intervals follow a normal (Gaussian) distribution centered on the scheduled event conclusion time:
+   $$w_i = \exp\left( -\frac{(t_i - \mu)^2}{2\sigma^2} \right)$$
+   where:
+   - $\mu$ = Scheduled event conclusion time (e.g., 21:30).
+   - $\sigma$ = Standard deviation (default 35 minutes).
+   - If weather is **Rainy** or **Heavy Rain**, $\sigma$ compresses (concentration factor $1.2\times$ to $1.4\times$), causing crowds to leave more urgently in a narrower time window.
+
+3. **Stop Allocation:**  
+   Demand for interval $i$ at stop $s$ is computed as:
+   $$\text{Demand}_{s, i} = \text{Total Egress} \times \text{Normalized Weight}_i \times \text{Stop Share}_s$$
+
+4. **Deficit / Surplus Determination:**  
+   $$\text{Deficit}_{s, i} = \max(0, \text{Demand}_{s, i} - \text{Scheduled Capacity}_{s, i})$$
+
+> **Transparency Note:** CrowdRoute AI uses deterministic, verifiable mathematical rules rather than unvalidated black-box neural networks. This guarantees reproducible, explainable results for transit operators.
+
+---
+
+## 13. Fixed-Fleet Bus Allocation Algorithm & Constraint Gates
+
+The allocator (`backend/app/allocator.py` & `backend/app/tradeoffs.py`) applies a constrained greedy heuristic subject to **7 strict operational safety gates**:
+
+1. **Gate 1 (Fleet Conservation):** Total initial fleet count must strictly equal total final fleet count ($\sum \text{buses}_{\text{initial}} = \sum \text{buses}_{\text{final}} = 16$).
+2. **Gate 2 (Bus Availability):** A bus can only be relocated if its operational status is `"available"`.
+3. **Gate 3 (No Duplicate Relocation):** A bus cannot be relocated twice in the same planning batch.
+4. **Gate 4 (Route Compatibility):** The bus must be authorized to serve the destination stop.
+5. **Gate 5 (Timely Arrival):** The relocated bus must depart and arrive at the destination *before* the target crowd peak begins:
+   $$\text{Departure Time} + \text{Travel Time} \le \text{Peak Window Start}$$
+6. **Gate 6 (Donor Stop Minimum Service):** A bus cannot be taken from a stop if the remaining buses would fall below that stop's configured safety baseline:
+   $$\text{Buses Remaining at Source} \ge \text{Min Service Buses}$$
+7. **Gate 7 (Net System Benefit):** The passenger capacity relief at the destination must exceed the service impact at the source stop.
+
+If no movement can pass all 7 gates, the system outputs `NO_SAFE_MOVE` with clear explanations instead of dispatching unsafe buses.
+
+---
+
+## 14. Step-by-Step Hackathon Demo Walkthrough
+
+### Scenario A: Normal Operations Baseline
+1. Open `http://localhost:5173/`.
+2. Notice the two-tier navigation with the badge **"VERIFIED 16-BUS FLEET CONSERVED"**.
+3. View the 4-card metric strip: **16 Fixed Fleet Buses**, **34,000 Expected Passengers**, **16/16 Conserved**, **15/30/60m Horizons**.
+4. Scroll to the **Interactive Bus Map**: observe the 3-column GIS layout with stop markers, positioned buses, and the deep navy capacity panel.
+
+### Scenario B: Event Delay (+30 Minutes)
+1. In the **Live Operations Controller** panel, click **"+30 Minutes"** or **"Final Event Delayed +30 Minutes"**.
+2. Notice the status pill updates to **"Updating..."** and then **"Up to Date"**.
+3. The peak departure window automatically shifts from `21:30` (9:30 PM) to `22:00` (10:00 PM).
+4. Demand curves, bus allocation recommendations, and the timetable update without requiring a page reload.
+
+### Scenario C: Sudden Monsoon Rain
+1. Click **"Rain Started"** or toggle weather to **"Heavy Rain"**.
+2. The weather multiplier compresses crowd departure urgency ($1.4\times$ factor).
+3. The risk indicator for `STOP_MAIN` escalates to **CRITICAL**, and the system suggests allocating additional buses from `STOP_PERIPHERAL`.
+
+### Scenario D: Fixed-Fleet Invariant Audit
+1. Inspect the **"Suggested Bus Changes & Trade-offs"** section.
+2. Confirm the audit badge shows: **"All 16/16 Buses Accounted For (Fixed Fleet Conserved)"**.
+3. Review the dual-sided impact:
+   - **Donor Stop (`STOP_PERIPHERAL`):** Service reduced from 6 to 5 buses (safely above the minimum reserve of 2).
+   - **Destination Stop (`STOP_MAIN`):** Gains $+60$ passenger capacity during the peak rush.
+
+### Scenario E: Time Input & Error Handling
+1. In the Live Operations Controller, enter `12:19 pm` in the custom time box and click **"Set Time"**.
+2. The system cleanly accepts and parses the civilian time format into `12:19 PM`.
+3. Enter `99:99` or text: the system displays a clear, helpful error message.
+4. Click **"Reset to Scenario Defaults"**: the system restores the 9:30 PM schedule and Clear weather.
+
+### Scenario F: Citizen Grievance Reporting & Tracking
+1. Click the red button **"Report Problem"** in the top action bar.
+2. Select `STOP_MAIN`, category `Overcrowding`, and submit a report.
+3. The modal displays the generated reference ID (e.g., `CR-2026-FD4A8`).
+4. Click **"Track Report"**, enter `CR-2026-FD4A8`, and click **"Track"**: the modal displays the persisted record from SQLite with status `Received`.
+
+---
+
+## 15. Automated Verification & Testing
+
+### 1. Run Backend Python Tests (53 tests)
+```powershell
+.\.venv\Scripts\python.exe -m pytest backend/tests
+```
+**Result:** **53 passed in ~1.2s**
+- `test_all.py`: 15 passed
+- `test_api.py`: 6 passed
+- `test_complaints.py`: 4 passed
+- `test_constraints.py`: 5 passed
+- `test_dynamic.py`: 11 passed
+- `test_portal_improvements.py`: 8 passed
+- `test_weather_and_scenario.py`: 4 passed
+
+### 2. Run Frontend Unit & Constraint Tests
+```powershell
+cd frontend
+npm test
+```
+**Result:** **All 3 test suites passed**
+- `test-chart.js`: Chart bounds, high-demand calculations, filtering.
+- `test-constraints.js`: Out-of-order response sequencing, event delays, 16-bus conservation invariant.
+- `test-time.js`: 12-hour AM/PM parsing, 24-hour validation, midnight crossing duration.
+
+### 3. Run Frontend Production Build Check
 ```powershell
 cd frontend
 npm run build
 ```
-Output:
-```
-vite v6.4.4 building for production...
-✓ 2206 modules transformed.
-dist/index.html                   0.98 kB
-dist/assets/index-BFZtYA4R.css   27.72 kB
-dist/assets/index-FnAbTgib.js   633.75 kB
-✓ built in 6.50s (0 errors)
-```
+**Result:** **0 TypeScript errors**, compiled cleanly with Vite in 9.4s.
 
 ---
 
-## 14. Sample Demonstration Commands (PowerShell)
+## 16. Current Limitations & Planned Improvements
 
-With the server running on `http://127.0.0.1:8000`:
-
-```powershell
-# 1. Health check
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/health" -Method Get | ConvertTo-Json
-
-# 2. Get synthetic scenario
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/scenario" -Method Get | ConvertTo-Json -Depth 3
-
-# 3. Request crowd forecast
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/forecast" -Method Post -ContentType "application/json" -Body '{"scheduled_event_end_time_override":"21:30"}' | ConvertTo-Json -Depth 4
-
-# 4. Request fixed-fleet allocation
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/allocate" -Method Post -ContentType "application/json" -Body '{"max_moves": 3}' | ConvertTo-Json -Depth 4
-
-# 5. Run comparative simulation
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/simulate" -Method Post -ContentType "application/json" -Body '{}' | ConvertTo-Json -Depth 4
-```
+- **Road Routing:** Bus transfer corridors are currently rendered as schematic direct paths between stands. Integration with OpenStreetMap OSRM routing engine is planned for real street navigation.
+- **GPS Telemetry:** Bus locations represent depot and terminal stationing rather than live physical AVL GPS pings.
+- **Fleet Scale:** The baseline demonstration scenario models 16 buses across 3 stands; scalability testing for 200+ buses across 50 stops is in progress.
 
 ---
 
-## 15. Current Limitations & Known Issues
+## 17. Team & Hackathon Details
 
-1. **Greedy Heuristic vs. Global Optimum:** The allocator uses a constrained greedy algorithm to optimize transparency and explainability. It does not solve a full mixed-integer linear programming (MILP) global optimum.
-2. **Synthetic Data Baseline:** Passenger arrival rates are generated using rule-based Gaussian egress models. They demonstrate planning logic rather than real-world sensor telemetry.
-3. **Discretization Window:** Calculations are performed in 15-minute discrete steps.
-4. **Fixed Fleet Assumption:** The synthetic demonstration assumes a 16-bus fleet inventory as configured in `demo_scenario.json`.
-
----
-
-## 16. Future Development Roadmap
-
-### Phase 2: Operator Dashboard & Visualization (Upcoming)
-- [ ] **Interactive Transit Operator UI:** Single-page dashboard displaying real-time scenario controls, crowd bottleneck warnings, and fleet status.
-- [ ] **Dynamic Timeline Charts:** Visual egress curves showing arrival surges per stop across 15-minute intervals.
-- [ ] **Bus Redistribution Visualizer:** Interactive cards showing proposed bus relocations, arrival timing, and donor stop service loss.
-- [ ] **Side-by-Side Queue Graphs:** Before vs. After peak queue reduction charts comparing the baseline schedule against CrowdRoute AI recommendations.
-
----
-
-## 17. Contributors & Hackathon Team
-
-- **Event:** SAKTHI HACKFEST'26 — Generative AI Domain  
-- **Team:** CrowdRoute AI Team  
-- **Repository Maintainer:** [jayakumarcyber](https://github.com/jayakumarcyber)
+- **Event:** SAKTHI HACKFEST'26  
+- **Team Name:** TEAM INNOVATORS  
+- **Domain:** Generative AI & AI-Driven Urban Decision Support Systems  
+- **Venue:** Sakthi Institute of Engineering and Technology, Tamil Nadu  
+- **Project Lead & Developer:** Jayakumar R. ([@jayakumarcyber](https://github.com/jayakumarcyber))
 
 ---
 
 ## 18. License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.

@@ -5,21 +5,38 @@ Returns 'No safe move' with clear operational explanations when constraints prev
 """
 
 from typing import Dict, List, Optional, Set
-from backend.app.models import (
-    AllocateRequest,
-    AllocateResponse,
-    Bus,
-    BusMove,
-    FleetAudit,
-    ForecastRequest,
-    ForecastResponse,
-    RejectedCandidate,
-    ScenarioData,
-    Stop,
-    calculate_interval_capacity,
-)
-from backend.app.forecast import generate_demand_forecast, load_default_scenario, parse_time_to_minutes
-from backend.app.tradeoffs import evaluate_candidate_move
+try:
+    from app.models import (
+        AllocateRequest,
+        AllocateResponse,
+        Bus,
+        BusMove,
+        FleetAudit,
+        ForecastRequest,
+        ForecastResponse,
+        RejectedCandidate,
+        ScenarioData,
+        Stop,
+        calculate_interval_capacity,
+    )
+    from app.forecast import generate_demand_forecast, load_default_scenario, parse_time_to_minutes
+    from app.tradeoffs import evaluate_candidate_move
+except ImportError:
+    from backend.app.models import (
+        AllocateRequest,
+        AllocateResponse,
+        Bus,
+        BusMove,
+        FleetAudit,
+        ForecastRequest,
+        ForecastResponse,
+        RejectedCandidate,
+        ScenarioData,
+        Stop,
+        calculate_interval_capacity,
+    )
+    from backend.app.forecast import generate_demand_forecast, load_default_scenario, parse_time_to_minutes
+    from backend.app.tradeoffs import evaluate_candidate_move
 
 
 def audit_fleet_conservation(

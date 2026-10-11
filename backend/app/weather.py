@@ -9,7 +9,10 @@ import logging
 from typing import Any, Dict, Optional, Tuple
 import httpx
 
-from backend.app.models import LiveWeatherResponse
+try:
+    from app.models import LiveWeatherResponse
+except ImportError:
+    from backend.app.models import LiveWeatherResponse
 
 logger = logging.getLogger("crowdroute_ai.weather")
 
