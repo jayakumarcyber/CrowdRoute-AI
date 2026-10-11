@@ -10,7 +10,9 @@
     "test:constraints": "tsx test-constraints.js",
     "test:time": "tsx test-time.js",
     "test:hooks": "tsx test-hooks-regression.ts",
-    "test": "npm run test:chart && npm run test:constraints && npm run test:time && npm run test:hooks"
+    "test:bus-capacity": "tsx test-bus-capacity.ts",
+    "test:telemetry": "tsx test-telemetry-pipeline.ts",
+    "test": "npm run test:chart && npm run test:constraints && npm run test:time && npm run test:hooks && npm run test:bus-capacity && npm run test:telemetry"
   },
   "dependencies": {
     "@types/leaflet": "^1.9.22",

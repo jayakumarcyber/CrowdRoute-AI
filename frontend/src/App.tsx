@@ -6,6 +6,7 @@ import {
   HistoricalRecord,
   HistoricalUploadResponse,
   LiveDataSummaryResponse,
+  LiveWeatherResponse,
   OperationalMode,
   ScenarioData,
   SimulateResponse,
@@ -108,6 +109,13 @@ export const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Live Ground Telemetry States (Open-Meteo & Festival Corridor)
+  const [liveWeather, setLiveWeather] = useState<LiveWeatherResponse | null>(null);
+  const [weatherError, setWeatherError] = useState<string | null>(null);
+  const [isRefreshingTelemetry, setIsRefreshingTelemetry] = useState<boolean>(false);
+  const [lastSuccessfulTelemetryTime, setLastSuccessfulTelemetryTime] = useState<string | null>(null);
+  const [isManualWeatherOverride, setIsManualWeatherOverride] = useState<boolean>(false);
+
   /**
    * Run complete 3-stage pipeline (Forecast -> Allocate -> Simulate)
    * Enforces asynchronous sequencing: older slow responses cannot overwrite newer state.
@@ -184,6 +192,21 @@ export const App: React.FC = () => {
           console.warn('Could not load live status:', e);
         }
 
+        // Fetch initial live weather telemetry
+        try {
+          const wRes = await api.getLiveWeather(false);
+          setLiveWeather(wRes);
+          if (wRes.status === 'UNAVAILABLE') {
+            setWeatherError(wRes.message || 'Open-Meteo telemetry currently unavailable');
+          } else {
+            setWeatherError(null);
+            setLastSuccessfulTelemetryTime(wRes.last_updated || getFormattedNow());
+          }
+        } catch (wErr: any) {
+          console.warn('Initial live weather check warning:', wErr);
+          setWeatherError(wErr.message || 'Telemetry provider offline');
+        }
+
         // Run baseline analysis
         await executeAnalysis(sc, 'DEMO_SYNTHETIC', null);
       } catch (err: any) {
@@ -218,6 +241,8 @@ export const App: React.FC = () => {
       setHistoricalRecords(null);
       setUploadResult(null);
       setSystemMode('DEMO_SYNTHETIC');
+      setIsManualWeatherOverride(false);
+      setWeatherError(null);
       const resetEntry: ActivityLogEntry = {
         id: `${Date.now()}-reset`,
         timestamp: getFormattedNow(),
@@ -239,6 +264,9 @@ export const App: React.FC = () => {
    * Reacts automatically without manual re-runs.
    */
   const handleLiveScenarioUpdate = (updatedScenario: ScenarioData, description: string) => {
+    if (description.toLowerCase().includes('weather')) {
+      setIsManualWeatherOverride(true);
+    }
     setScenario(updatedScenario);
     const newEntry: ActivityLogEntry = {
       id: `${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -256,12 +284,75 @@ export const App: React.FC = () => {
   };
 
   /**
+   * Dedicated Refresh handler for Festival Corridor Telemetry.
+   * Requests real ground observation from Open-Meteo with force_refresh=true.
+   * Synchronizes scenario weather when not in manual override and re-runs downstream analysis.
+   * Prevents concurrent click duplication and preserves timestamps truthfully.
+   */
+  const handleRefreshTelemetry = async () => {
+    if (isRefreshingTelemetry || isLoading || isUpdating) {
+      return;
+    }
+
+    setIsRefreshingTelemetry(true);
+    setIsUpdating(true);
+    setErrorMessage(null);
+
+    try {
+      const weatherRes = await api.getLiveWeather(true);
+      setLiveWeather(weatherRes);
+
+      if (weatherRes.status === 'UNAVAILABLE') {
+        setWeatherError(weatherRes.message || 'Open-Meteo meteorological feed returned unavailable.');
+        // Do not advance lastSuccessfulTelemetryTime on failure!
+        if (scenario) {
+          await executeAnalysis(scenario, systemMode, historicalRecords);
+        }
+      } else {
+        setWeatherError(null);
+        setLastSuccessfulTelemetryTime(weatherRes.last_updated || getFormattedNow());
+
+        let targetScenario = scenario;
+        if (!isManualWeatherOverride && scenario && weatherRes.condition) {
+          if (scenario.weather.condition !== weatherRes.condition) {
+            targetScenario = {
+              ...scenario,
+              weather: {
+                ...scenario.weather,
+                condition: weatherRes.condition,
+              },
+            };
+            setScenario(targetScenario);
+          }
+        }
+
+        const logEntry: ActivityLogEntry = {
+          id: `${Date.now()}-telemetry`,
+          timestamp: getFormattedNow(),
+          action: 'Festival Corridor Telemetry Refreshed',
+          details: `Ground observation: ${weatherRes.condition_description} (${weatherRes.temperature_c ?? '--'}°C, ${weatherRes.rain_mm ?? weatherRes.precipitation_mm ?? 0} mm rain). Status: ${weatherRes.status}.`,
+          type: 'weather',
+        };
+        setActivityLog((prev) => [logEntry, ...prev.slice(0, 24)]);
+
+        if (targetScenario) {
+          await executeAnalysis(targetScenario, systemMode, historicalRecords);
+        }
+      }
+    } catch (err: any) {
+      console.error('Telemetry refresh error:', err);
+      setWeatherError(err.message || 'Failed to connect to Open-Meteo meteorological feed.');
+    } finally {
+      setIsRefreshingTelemetry(false);
+      setIsUpdating(false);
+    }
+  };
+
+  /**
    * Refresh Analysis
    */
   const handleRefresh = () => {
-    if (scenario) {
-      executeAnalysis(scenario, systemMode, historicalRecords);
-    }
+    handleRefreshTelemetry();
   };
 
   /**
@@ -510,11 +601,16 @@ export const App: React.FC = () => {
               }}
               onLiveScenarioUpdate={handleLiveScenarioUpdate}
               onRunPrediction={handleRunPrediction}
-              isUpdating={isUpdating}
+              isUpdating={isUpdating || isRefreshingTelemetry}
               activityLog={activityLog}
               lastUpdateTimestamp={lastUpdateTimestamp}
+              lastSuccessfulTelemetryTime={lastSuccessfulTelemetryTime}
               isLoading={isLoading}
               hasRunInitialPrediction={hasRunInitialPrediction}
+              liveWeather={liveWeather}
+              weatherError={weatherError}
+              errorMessage={errorMessage}
+              isManualWeatherOverride={isManualWeatherOverride}
             />
           ) : activePage === 'complaints' ? (
             <div className="py-6">

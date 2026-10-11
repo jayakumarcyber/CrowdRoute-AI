@@ -11,6 +11,7 @@ import { BusTimetable } from '../components/BusTimetable';
 import {
   AllocateResponse,
   ForecastResponse,
+  LiveWeatherResponse,
   OperationalMode,
   ScenarioData,
 } from '../types/api';
@@ -31,8 +32,13 @@ interface HomePageProps {
   isUpdating?: boolean;
   activityLog?: ActivityLogEntry[];
   lastUpdateTimestamp?: string;
+  lastSuccessfulTelemetryTime?: string | null;
   isLoading?: boolean;
   hasRunInitialPrediction?: boolean;
+  liveWeather?: LiveWeatherResponse | null;
+  weatherError?: string | null;
+  errorMessage?: string | null;
+  isManualWeatherOverride?: boolean;
 }
 
 
@@ -51,8 +57,13 @@ export const HomePage: React.FC<HomePageProps> = ({
   isUpdating = false,
   activityLog = [],
   lastUpdateTimestamp = '',
+  lastSuccessfulTelemetryTime = null,
   isLoading,
   hasRunInitialPrediction = true,
+  liveWeather = null,
+  weatherError = null,
+  errorMessage = null,
+  isManualWeatherOverride = false,
 }) => {
 
   const [selectedHierarchyStop, setSelectedHierarchyStop] = useState<string>('STOP_MAIN');
@@ -86,15 +97,24 @@ export const HomePage: React.FC<HomePageProps> = ({
       />
 
 
-      {/* 3. DARK 4-CARD SUMMARY METRICS STRIP + TELEMETRY CARD (SCREENSHOT 2) */}
+      {/* 3. DARK 4-CARD SUMMARY METRICS STRIP + TELEMETRY CARD */}
       <SummaryMetrics
         scenario={scenario}
         forecast={forecast}
+        allocation={allocation}
         systemMode={systemMode}
         onSetMode={onSetMode}
         onResetDefaults={onResetDefaults}
         onRefresh={onRefresh}
         isLoading={isLoading}
+        isUpdating={isUpdating}
+        liveWeather={liveWeather}
+        weatherError={weatherError}
+        lastUpdateTimestamp={lastUpdateTimestamp}
+        lastSuccessfulTelemetryTime={lastSuccessfulTelemetryTime}
+        errorMessage={errorMessage}
+        hasRunInitialPrediction={hasRunInitialPrediction}
+        isManualWeatherOverride={isManualWeatherOverride}
       />
 
       {/* 4. LIVE FESTIVAL OPERATIONS CONTROLLER */}
@@ -156,6 +176,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           <CrowdForecast
             forecast={forecast}
             stops={scenario?.stops || []}
+            fleet={scenario?.fleet || []}
             onViewDetailedTable={() => onNavigateDashboard('forecast-table')}
           />
         </div>

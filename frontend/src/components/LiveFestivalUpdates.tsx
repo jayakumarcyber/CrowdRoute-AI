@@ -16,7 +16,7 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { ScenarioData, WeatherCondition } from '../types/api';
-import { formatTo12Hour, parseAnyTimeToHHMM } from '../utils/timeFormat';
+import { formatTo12Hour, parseAnyTimeToHHMM, shiftTimeHHMM } from '../utils/timeFormat';
 
 export interface ActivityLogEntry {
   id: string;
@@ -81,23 +81,19 @@ export const LiveFestivalUpdates: React.FC<LiveFestivalUpdatesProps> = ({
 
   // Delay change handler
   const handleDelayChange = (delayMinutes: number) => {
-    // Base time is 21:30 from standard schedule
-    const baseHour = 21;
-    const baseMin = 30;
-    const totalMin = baseHour * 60 + baseMin + delayMinutes;
-    const h = Math.floor(totalMin / 60) % 24;
-    const m = totalMin % 60;
-    const newTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    // Standard baseline scheduled conclusion is 21:30
+    const newTime = shiftTimeHHMM('21:30', delayMinutes);
 
     if (newTime === currentEndTime) return;
 
     const updated: ScenarioData = JSON.parse(JSON.stringify(scenario));
     updated.festival_programme.scheduled_event_end_time = newTime;
+    updated.festival_programme.event_delay_minutes = delayMinutes;
 
     const desc =
       delayMinutes === 0
-        ? `Event timing set to On Schedule (${newTime})`
-        : `Event delayed by +${delayMinutes} mins (New conclusion: ${newTime})`;
+        ? `Event timing set to On Schedule (${formatTo12Hour(newTime)})`
+        : `Event delayed by +${delayMinutes} mins (New conclusion: ${formatTo12Hour(newTime)})`;
 
     onUpdateScenario(updated, desc);
   };
@@ -139,14 +135,7 @@ export const LiveFestivalUpdates: React.FC<LiveFestivalUpdatesProps> = ({
 
   // Quick Action: Delay +30
   const handleDelay30 = () => {
-    // Read current end time and add 30 mins
-    const [hStr, mStr] = currentEndTime.split(':');
-    const curMin = parseInt(hStr, 10) * 60 + parseInt(mStr, 10);
-    const newTotal = curMin + 30;
-    const nh = Math.floor(newTotal / 60) % 24;
-    const nm = newTotal % 60;
-    const newTime = `${String(nh).padStart(2, '0')}:${String(nm).padStart(2, '0')}`;
-
+    const newTime = shiftTimeHHMM(currentEndTime, 30);
     const updated: ScenarioData = JSON.parse(JSON.stringify(scenario));
     updated.festival_programme.scheduled_event_end_time = newTime;
     onUpdateScenario(

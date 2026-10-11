@@ -298,3 +298,17 @@ export function parseAnyTimeToHHMM(input: string | null | undefined): string | n
   return null;
 }
 
+/**
+ * Shifts a 24-hour HH:MM time string by a specified number of minutes.
+ * Handles cross-midnight wrapping properly (e.g., 23:45 + 30 mins -> 00:15).
+ */
+export function shiftTimeHHMM(timeStr: string, minutesToAdd: number): string {
+  const p = parseHHMM(timeStr);
+  if (!p) return timeStr;
+  let totalMins = p.hours * 60 + p.minutes + minutesToAdd;
+  totalMins = ((totalMins % 1440) + 1440) % 1440;
+  const h = Math.floor(totalMins / 60);
+  const m = totalMins % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+

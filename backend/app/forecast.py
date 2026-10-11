@@ -94,6 +94,9 @@ def generate_demand_forecast(request: Optional[ForecastRequest] = None) -> Forec
 
     # Apply optional request overrides
     event_end_str = request.scheduled_event_end_time_override or programme.scheduled_event_end_time
+    if getattr(programme, "event_delay_minutes", 0) > 0 and not request.scheduled_event_end_time_override:
+        end_m = (parse_time_to_minutes(event_end_str) + programme.event_delay_minutes) % 1440
+        event_end_str = format_minutes_to_time(end_m)
     weather_cond = request.weather_condition_override or weather.condition
     total_attendance = request.attendance_override if request.attendance_override is not None else programme.expected_total_attendance
 
